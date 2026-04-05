@@ -1,0 +1,12 @@
+# Binaries
+opa-authzen-plugin
+*.exe
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
