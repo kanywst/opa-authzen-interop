@@ -152,5 +152,5 @@ All tests passed!
 - [OpenID AuthZEN Working Group](https://openid.net/wg/authzen/)
 - [Authorization API 1.0 spec](https://openid.github.io/authzen/)
 - [AuthZEN Interop Results](https://authzen-interop.net)
-- [openid/authzen](https://github.com/openid/authzen) — spec, test harness, interop infrastructure
-- [opa-authzen-plugin](https://github.com/kanywst/opa-authzen-plugin) — OPA plugin providing the AuthZEN API layer
+- [openid/authzen](https://github.com/openid/authzen)
+- [opa-authzen-plugin](https://github.com/kanywst/opa-authzen-plugin)
