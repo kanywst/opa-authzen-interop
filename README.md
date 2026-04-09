@@ -41,16 +41,22 @@ yarn test http://localhost:8181 authorization-api-1_0-01 console
 ### Using the binary (development)
 
 ```bash
-cd ../opa-authzen-plugin && make build && cd -
+# clone the plugin
+git clone https://github.com/kanywst/opa-authzen-plugin.git
+cd opa-authzen-plugin && make build
+
+# clone the interop
+git clone https://github.com/kanywst/opa-authzen-interop.git
+cd opa-authzen-interop
+
+# run the tests
 ./scripts/start-pdp.sh
 ./scripts/test-local.sh
 ```
 
 ## Test results
 
-All 40 single evaluation tests pass (authorization-api-1_0-01).
-
-Batch evaluation (`POST /access/v1/evaluations`) is not yet implemented in opa-authzen-plugin and returns 404. The authorization-api-1_0-02 tests will fail on the batch portion.
+All tests pass.
 
 <details>
 <summary>test-local.sh output</summary>
@@ -110,12 +116,13 @@ PASS can_delete_todo subject=CiRmZDQ2MTRk... -> rick@the-citadel.com
 PASS can_delete_todo subject=CiRmZDQ2MTRk... -> jerry@the-smiths.com
 
 --- Batch Evaluations ---
-ERROR HTTP 404
-ERROR HTTP 404
-ERROR HTTP 404
+PASS [batch] can_update_todo subject=CiRmZDA2MTRk... evaluations=2
+PASS [batch] can_update_todo subject=CiRmZDE2MTRk... evaluations=2
+PASS [batch] can_update_todo subject=CiRmZDQ2MTRk... evaluations=2
 
 === Results ===
-Total: 43  Pass: 40  Fail: 0  Error: 3
+Total: 43  Pass: 43  Fail: 0  Error: 0
+All tests passed!
 ```
 
 </details>
@@ -137,7 +144,7 @@ Total: 43  Pass: 40  Fail: 0  Error: 3
 | Endpoint           | Path                                     | Status      |
 | ------------------ | ---------------------------------------- | ----------- |
 | Evaluation         | `POST /access/v1/evaluation`             | implemented |
-| Evaluations(batch) | `POST /access/v1/evaluations`            | not yet     |
+| Evaluations(batch) | `POST /access/v1/evaluations`            | implemented |
 | PDP Metadata       | `GET /.well-known/authzen-configuration` | implemented |
 
 ## References
