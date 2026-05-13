@@ -190,6 +190,18 @@ test_subject_search_update_owned_by_rick if {
 	result == {{"type": "user", "id": rick_pid}}
 }
 
+# subject_search with a subject type the policy doesn't model returns an
+# empty result set, so the rule cannot leak user enumeration through a
+# spec-ignored input.subject.id when the type doesn't match.
+test_subject_search_unknown_type_returns_empty if {
+	result := authzen.subject_search with input as {
+		"subject": {"type": "robot"},
+		"action": {"name": "can_read_user"},
+		"resource": {"type": "user", "id": "beth@the-smiths.com"},
+	}
+	count(result) == 0
+}
+
 # --- Resource Search (spec Section 8.2) ------------------------------------
 
 # Rick can update every todo in data (admin).

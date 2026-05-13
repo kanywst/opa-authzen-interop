@@ -134,6 +134,7 @@ PASS action_search/Rick on user resource (user-scoped only) -> 1 result(s)
 PASS action_search/Morty on Rick's todo -> 2 result(s)
 PASS action_search/Beth on own todo -> 1 result(s)
 PASS resource_search/cross-type leak guarded -> 0 result(s)
+PASS subject_search/non-user type returns empty -> 0 result(s)
 
 --- Search pagination ---
 PASS pagination/page-1 returned 3 + non-empty next_token
@@ -141,7 +142,7 @@ PASS pagination/page-2 closes the sequence (5 unique results, empty next_token)
 PASS pagination/tamper detected (400)
 
 === Results ===
-Total: 59  Pass: 59  Fail: 0  Error: 0
+Total: 60  Pass: 60  Fail: 0  Error: 0
 All tests passed!
 ```
 
