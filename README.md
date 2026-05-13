@@ -120,8 +120,24 @@ PASS [batch] can_update_todo subject=CiRmZDA2MTRk... evaluations=2
 PASS [batch] can_update_todo subject=CiRmZDE2MTRk... evaluations=2
 PASS [batch] can_update_todo subject=CiRmZDQ2MTRk... evaluations=2
 
+--- Search APIs ---
+PASS subject_search/can_read_user -> 5 result(s)
+PASS subject_search/can_create_todo -> 3 result(s)
+PASS subject_search/can_update_todo on Rick-owned -> 1 result(s)
+PASS resource_search/Rick can_update_todo -> 4 result(s)
+PASS resource_search/Morty can_update_todo -> 1 result(s)
+PASS resource_search/Beth can_update_todo -> 0 result(s)
+PASS action_search/Rick on own todo -> 5 result(s)
+PASS action_search/Morty on Rick's todo -> 3 result(s)
+PASS action_search/Beth on own todo -> 2 result(s)
+
+--- Search pagination ---
+PASS pagination/page-1 returned 2 + non-empty next_token
+PASS pagination/page-2 follows token and returns fresh results
+PASS pagination/tamper detected (400)
+
 === Results ===
-Total: 43  Pass: 43  Fail: 0  Error: 0
+Total: 55  Pass: 55  Fail: 0  Error: 0
 All tests passed!
 ```
 
@@ -145,7 +161,12 @@ All tests passed!
 | ------------------ | ---------------------------------------- | ----------- |
 | Evaluation         | `POST /access/v1/evaluation`             | implemented |
 | Evaluations(batch) | `POST /access/v1/evaluations`            | implemented |
+| Subject Search     | `POST /access/v1/search/subject`         | implemented |
+| Resource Search    | `POST /access/v1/search/resource`        | implemented |
+| Action Search      | `POST /access/v1/search/action`          | implemented |
 | PDP Metadata       | `GET /.well-known/authzen-configuration` | implemented |
+
+The Search APIs are enabled via the `search` block in `config.yaml`, which points the plugin at the `subject_search`, `resource_search`, and `action_search` rules in `policy/authzen.rego`. Pagination is supported via the opaque `page.next_token`.
 
 ## References
 
