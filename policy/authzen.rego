@@ -37,18 +37,14 @@ allow if {
 	role in {"admin", "editor"}
 }
 
-# can_update_todo: admin can update any todo.
+# can_update_todo: admin or evil_genius can update any todo. (Note that
+# can_delete_todo deliberately only grants admin; evil_genius is
+# scoped to updates per the original interop scenario.)
 allow if {
 	input.action.name == "can_update_todo"
 	input.resource.type == "todo"
-	"admin" in user.roles
-}
-
-# can_update_todo: evil_genius can update any todo.
-allow if {
-	input.action.name == "can_update_todo"
-	input.resource.type == "todo"
-	"evil_genius" in user.roles
+	some role in user.roles
+	role in {"admin", "evil_genius"}
 }
 
 # can_update_todo: editor can update only their own todos.
@@ -90,7 +86,11 @@ known_actions := {
 
 # Subject Search: users (by PID) that would be permitted for the input
 # action + resource. `input.subject.id` is absent (spec Section 8.1).
+# Gated on `input.subject.type == "user"` so a request searching for a
+# different subject type can't fall through and enumerate users — the
+# same cross-type leak guard used on resource_search branches.
 subject_search contains {"type": "user", "id": pid} if {
+	input.subject.type == "user"
 	some pid, _ in data.users
 	allow with input as {
 		"subject": {"type": "user", "id": pid},

@@ -279,6 +279,13 @@ test_search_count "/access/v1/search/resource" \
   '{"subject":{"type":"user","id":"'$RICK'"},"action":{"name":"can_read_todos"},"resource":{"type":"user"}}' \
   0 "resource_search/cross-type leak guarded"
 
+# Subject Search: a non-user subject type must not fall through and
+# enumerate data.users. Same cross-type guard as above, applied to the
+# subject dimension.
+test_search_count "/access/v1/search/subject" \
+  '{"subject":{"type":"robot"},"action":{"name":"can_read_user"},"resource":{"type":"user","id":"beth@the-smiths.com"}}' \
+  0 "subject_search/non-user type returns empty"
+
 # Pagination: 5 known users / limit=3 -> page 1 returns 3 + a token, page 2
 # returns the remaining 2 and an empty next_token. limit=3 is chosen so the
 # whole result set is traversed in exactly two requests, letting the
