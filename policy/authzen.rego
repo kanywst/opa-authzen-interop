@@ -83,23 +83,36 @@ subject_search contains {"type": "user", "id": pid} if {
 	}
 }
 
-# Resource Search: todos that the input subject can act upon. The candidate
-# resource carries the owner from data so ownership-based rules apply
-# correctly (spec Section 8.2).
-resource_search contains {
-	"type": "todo",
-	"id": tid,
-	"properties": {"ownerID": todo.ownerID},
-} if {
+# Resource Search: enumerate resources of the requested type that the input
+# subject can act upon (spec Section 8.2). Each rule branch is gated on
+# `input.resource.type` so a request for one type cannot leak results of
+# another. The todo branch carries the owner from data so ownership-based
+# rules apply correctly; the user branch covers `can_read_user`, which
+# treats user records as resources.
+
+resource_search contains item if {
+	input.resource.type == "todo"
 	some tid, todo in data.todos
+	item := {
+		"type": "todo",
+		"id": tid,
+		"properties": {"ownerID": todo.ownerID},
+	}
 	allow with input as {
 		"subject": input.subject,
 		"action": input.action,
-		"resource": {
-			"type": "todo",
-			"id": tid,
-			"properties": {"ownerID": todo.ownerID},
-		},
+		"resource": item,
+	}
+}
+
+resource_search contains item if {
+	input.resource.type == "user"
+	some _, u in data.users
+	item := {"type": "user", "id": u.email}
+	allow with input as {
+		"subject": input.subject,
+		"action": input.action,
+		"resource": item,
 	}
 }
 
