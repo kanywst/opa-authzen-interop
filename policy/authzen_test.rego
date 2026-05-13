@@ -248,8 +248,10 @@ test_resource_search_unknown_type_returns_empty if {
 
 # --- Action Search (spec Section 8.3) --------------------------------------
 
-# Rick (admin) is allowed every modeled action.
-test_action_search_rick_returns_all_actions if {
+# Rick (admin) on a todo: every todo-scoped action. can_read_user is
+# excluded because the new resource-type guards make that action only
+# valid on user resources.
+test_action_search_rick_on_own_todo if {
 	result := authzen.action_search with input as {
 		"subject": {"type": "user", "id": rick_pid},
 		"resource": {
@@ -258,11 +260,25 @@ test_action_search_rick_returns_all_actions if {
 			"properties": {"ownerID": "rick@the-citadel.com"},
 		},
 	}
-	count(result) == 5
+	result == {
+		{"name": "can_read_todos"},
+		{"name": "can_create_todo"},
+		{"name": "can_update_todo"},
+		{"name": "can_delete_todo"},
+	}
 }
 
-# Morty (editor) on a Rick-owned todo: read_user/read_todos/create_todo only
-# (no update/delete because ownership doesn't match).
+# Rick (admin) on a user resource: only can_read_user is in scope.
+test_action_search_rick_on_user if {
+	result := authzen.action_search with input as {
+		"subject": {"type": "user", "id": rick_pid},
+		"resource": {"type": "user", "id": "beth@the-smiths.com"},
+	}
+	result == {{"name": "can_read_user"}}
+}
+
+# Morty (editor) on a Rick-owned todo: read_todos and create_todo only
+# (update/delete blocked by ownership, can_read_user blocked by type).
 test_action_search_morty_on_rick_todo if {
 	result := authzen.action_search with input as {
 		"subject": {"type": "user", "id": morty_pid},
@@ -273,13 +289,12 @@ test_action_search_morty_on_rick_todo if {
 		},
 	}
 	result == {
-		{"name": "can_read_user"},
 		{"name": "can_read_todos"},
 		{"name": "can_create_todo"},
 	}
 }
 
-# Morty (editor) on his own todo: full set including update/delete.
+# Morty (editor) on his own todo: every todo-scoped action.
 test_action_search_morty_on_own_todo if {
 	result := authzen.action_search with input as {
 		"subject": {"type": "user", "id": morty_pid},
@@ -290,7 +305,6 @@ test_action_search_morty_on_own_todo if {
 		},
 	}
 	result == {
-		{"name": "can_read_user"},
 		{"name": "can_read_todos"},
 		{"name": "can_create_todo"},
 		{"name": "can_update_todo"},
@@ -298,8 +312,8 @@ test_action_search_morty_on_own_todo if {
 	}
 }
 
-# Beth (viewer) on any todo: read-only.
-test_action_search_beth_read_only if {
+# Beth (viewer) on a todo: can_read_todos only.
+test_action_search_beth_on_todo if {
 	result := authzen.action_search with input as {
 		"subject": {"type": "user", "id": beth_pid},
 		"resource": {
@@ -308,8 +322,17 @@ test_action_search_beth_read_only if {
 			"properties": {"ownerID": "beth@the-smiths.com"},
 		},
 	}
-	result == {
-		{"name": "can_read_user"},
-		{"name": "can_read_todos"},
+	result == {{"name": "can_read_todos"}}
+}
+
+# resource_search across a mismatched action/type pair (todo action on
+# user resource) must return zero results — proves the new guards stop
+# cross-type leakage.
+test_resource_search_cross_type_returns_empty if {
+	result := authzen.resource_search with input as {
+		"subject": {"type": "user", "id": rick_pid},
+		"action": {"name": "can_read_todos"},
+		"resource": {"type": "user"},
 	}
+	count(result) == 0
 }

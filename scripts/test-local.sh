@@ -248,20 +248,36 @@ test_search_count "/access/v1/search/resource" \
   '{"subject":{"type":"user","id":"'$RICK'"},"action":{"name":"can_read_user"},"resource":{"type":"spaceship"}}' \
   0 "resource_search/unknown type returns empty"
 
-# Action Search: Rick (admin) can perform every modeled action.
+# Action Search: Rick (admin) on a todo gets every todo-scoped action.
+# can_read_user is excluded because the policy guards each rule by the
+# action's expected resource type.
 test_search_count "/access/v1/search/action" \
   '{"subject":{"type":"user","id":"'$RICK'"},"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b92","properties":{"ownerID":"rick@the-citadel.com"}}}' \
-  5 "action_search/Rick on own todo"
+  4 "action_search/Rick on own todo (todo-scoped only)"
 
-# Action Search: Morty on Rick's todo -> read_user/read_todos/create_todo only.
+# Action Search: Rick (admin) on a user resource: only can_read_user is
+# in scope. Catches cross-type leakage like surfacing can_update_todo
+# against a user resource.
+test_search_count "/access/v1/search/action" \
+  '{"subject":{"type":"user","id":"'$RICK'"},"resource":{"type":"user","id":"beth@the-smiths.com"}}' \
+  1 "action_search/Rick on user resource (user-scoped only)"
+
+# Action Search: Morty on Rick's todo -> read_todos and create_todo only.
 test_search_count "/access/v1/search/action" \
   '{"subject":{"type":"user","id":"'$MORTY'"},"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b92","properties":{"ownerID":"rick@the-citadel.com"}}}' \
-  3 "action_search/Morty on Rick's todo"
+  2 "action_search/Morty on Rick's todo"
 
-# Action Search: Beth (viewer) -> read_user/read_todos only.
+# Action Search: Beth (viewer) on a todo -> can_read_todos only.
 test_search_count "/access/v1/search/action" \
   '{"subject":{"type":"user","id":"'$BETH'"},"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b94","properties":{"ownerID":"beth@the-smiths.com"}}}' \
-  2 "action_search/Beth on own todo"
+  1 "action_search/Beth on own todo"
+
+# Resource Search: a todo-scoped action against a user-typed search must
+# return zero results — the policy's per-rule resource-type guard stops
+# the cross-type leakage that the unguarded version had.
+test_search_count "/access/v1/search/resource" \
+  '{"subject":{"type":"user","id":"'$RICK'"},"action":{"name":"can_read_todos"},"resource":{"type":"user"}}' \
+  0 "resource_search/cross-type leak guarded"
 
 # Pagination: 5 known users / limit=3 -> page 1 returns 3 + a token, page 2
 # returns the remaining 2 and an empty next_token. limit=3 is chosen so the
