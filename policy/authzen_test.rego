@@ -224,6 +224,28 @@ test_resource_search_beth_update_returns_empty if {
 	count(result) == 0
 }
 
+# can_read_user is allowed for every known user, so a user-typed
+# resource_search returns all 5 entries in data.users.
+test_resource_search_user_read_returns_all_users if {
+	result := authzen.resource_search with input as {
+		"subject": {"type": "user", "id": rick_pid},
+		"action": {"name": "can_read_user"},
+		"resource": {"type": "user"},
+	}
+	count(result) == count(data.users)
+}
+
+# A resource type the policy doesn't model returns an empty result set,
+# so each search branch is correctly scoped by input.resource.type.
+test_resource_search_unknown_type_returns_empty if {
+	result := authzen.resource_search with input as {
+		"subject": {"type": "user", "id": rick_pid},
+		"action": {"name": "can_read_user"},
+		"resource": {"type": "spaceship"},
+	}
+	count(result) == 0
+}
+
 # --- Action Search (spec Section 8.3) --------------------------------------
 
 # Rick (admin) is allowed every modeled action.
