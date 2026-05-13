@@ -7,53 +7,69 @@ default allow := false
 # Resolve user from subject ID (base64-encoded PID)
 user := data.users[input.subject.id]
 
-# can_read_user: always allow for authenticated users
+# Every authorization rule below carries the action's expected resource
+# type as an explicit precondition. This keeps `allow` from silently
+# matching cross-type requests (e.g. asking whether a user resource is
+# `can_update_todo`), which becomes user-visible once the Search APIs
+# re-evaluate `allow` against candidate entities. The original interop
+# test cases continue to pass because they always use the correct
+# resource type for each action.
+
+# can_read_user: any authenticated user, on a user-typed resource.
 allow if {
 	input.action.name == "can_read_user"
+	input.resource.type == "user"
 	user
 }
 
-# can_read_todos: always allow for authenticated users
+# can_read_todos: any authenticated user, on a todo-typed resource.
 allow if {
 	input.action.name == "can_read_todos"
+	input.resource.type == "todo"
 	user
 }
 
-# can_create_todo: allow for admin or editor roles
+# can_create_todo: allow for admin or editor roles, on a todo-typed resource.
 allow if {
 	input.action.name == "can_create_todo"
+	input.resource.type == "todo"
 	some role in user.roles
 	role in {"admin", "editor"}
 }
 
-# can_update_todo: admin can update any todo
+# can_update_todo: admin can update any todo.
 allow if {
 	input.action.name == "can_update_todo"
+	input.resource.type == "todo"
 	"admin" in user.roles
 }
 
-# can_update_todo: evil_genius can update any todo
+# can_update_todo: evil_genius can update any todo.
 allow if {
 	input.action.name == "can_update_todo"
+	input.resource.type == "todo"
 	"evil_genius" in user.roles
 }
 
-# can_update_todo: editor can update only their own todos
+# can_update_todo: editor can update only their own todos.
 allow if {
 	input.action.name == "can_update_todo"
+	input.resource.type == "todo"
 	"editor" in user.roles
 	input.resource.properties.ownerID == user.email
 }
 
-# can_delete_todo: admin can delete any todo
+# can_delete_todo: admin can delete any todo.
 allow if {
 	input.action.name == "can_delete_todo"
+	input.resource.type == "todo"
 	"admin" in user.roles
 }
 
-# can_delete_todo: editor can delete only their own todos
+# can_delete_todo: editor can delete only their own todos.
 allow if {
 	input.action.name == "can_delete_todo"
+	input.resource.type == "todo"
 	"editor" in user.roles
 	input.resource.properties.ownerID == user.email
 }
