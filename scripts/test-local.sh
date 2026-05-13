@@ -236,6 +236,18 @@ test_search_count "/access/v1/search/resource" \
   '{"subject":{"type":"user","id":"'$BETH'"},"action":{"name":"can_update_todo"},"resource":{"type":"todo"}}' \
   0 "resource_search/Beth can_update_todo"
 
+# Resource Search: user-typed search returns all 5 known users (can_read_user
+# is universal). Verifies that the rule selects the correct branch by
+# input.resource.type.
+test_search_count "/access/v1/search/resource" \
+  '{"subject":{"type":"user","id":"'$RICK'"},"action":{"name":"can_read_user"},"resource":{"type":"user"}}' \
+  5 "resource_search/Rick can_read_user (type=user)"
+
+# Resource Search: an unmodeled type returns no results.
+test_search_count "/access/v1/search/resource" \
+  '{"subject":{"type":"user","id":"'$RICK'"},"action":{"name":"can_read_user"},"resource":{"type":"spaceship"}}' \
+  0 "resource_search/unknown type returns empty"
+
 # Action Search: Rick (admin) can perform every modeled action.
 test_search_count "/access/v1/search/action" \
   '{"subject":{"type":"user","id":"'$RICK'"},"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b92","properties":{"ownerID":"rick@the-citadel.com"}}}' \
@@ -251,16 +263,19 @@ test_search_count "/access/v1/search/action" \
   '{"subject":{"type":"user","id":"'$BETH'"},"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b94","properties":{"ownerID":"beth@the-smiths.com"}}}' \
   2 "action_search/Beth on own todo"
 
-# Pagination: page-1 of can_read_user with limit=2 should yield 2 + a token.
+# Pagination: 5 known users / limit=3 -> page 1 returns 3 + a token, page 2
+# returns the remaining 2 and an empty next_token. limit=3 is chosen so the
+# whole result set is traversed in exactly two requests, letting the
+# assertion below check completion semantics, not just partial coverage.
 echo ""
 echo "--- Search pagination ---"
 page1_resp=$(curl -s -X POST "${PDP_URL}/access/v1/search/subject" \
   -H "Content-Type: application/json" \
-  -d '{"subject":{"type":"user"},"action":{"name":"can_read_user"},"resource":{"type":"user","id":"beth@the-smiths.com"},"page":{"limit":2}}')
+  -d '{"subject":{"type":"user"},"action":{"name":"can_read_user"},"resource":{"type":"user","id":"beth@the-smiths.com"},"page":{"limit":3}}')
 page1_count=$(echo "$page1_resp" | python3 -c "import sys,json; print(len(json.load(sys.stdin)['results']))" 2>/dev/null)
 page1_token=$(echo "$page1_resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['page']['next_token'])" 2>/dev/null)
-if [ "$page1_count" = "2" ] && [ -n "$page1_token" ]; then
-  echo -e "${GREEN}PASS${NC} pagination/page-1 returned 2 + non-empty next_token"
+if [ "$page1_count" = "3" ] && [ -n "$page1_token" ]; then
+  echo -e "${GREEN}PASS${NC} pagination/page-1 returned 3 + non-empty next_token"
   PASS=$((PASS+1))
 else
   echo -e "${RED}FAIL${NC} pagination/page-1: count=$page1_count token=$page1_token"
@@ -268,32 +283,40 @@ else
   FAIL=$((FAIL+1))
 fi
 
-# Pagination: follow the token. Across both pages we expect 5 unique results
-# and an empty next_token on the final page.
+# Follow the token. The combined result set must contain all 5 distinct
+# users and the response MUST advertise an empty next_token, i.e. the
+# pagination sequence terminates exactly when the data is exhausted.
 page2_resp=$(curl -s -X POST "${PDP_URL}/access/v1/search/subject" \
   -H "Content-Type: application/json" \
-  -d "{\"subject\":{\"type\":\"user\"},\"action\":{\"name\":\"can_read_user\"},\"resource\":{\"type\":\"user\",\"id\":\"beth@the-smiths.com\"},\"page\":{\"limit\":2,\"token\":\"$page1_token\"}}")
-page2_check=$(python3 <<EOF
-import json
-p1 = json.loads('''$page1_resp''')['results']
-p2 = json.loads('''$page2_resp''')
-ids = {r['id'] for r in p1 + p2['results']}
-print("ok" if len(ids) >= 4 and 'page' in p2 else "bad")
+  -d "{\"subject\":{\"type\":\"user\"},\"action\":{\"name\":\"can_read_user\"},\"resource\":{\"type\":\"user\",\"id\":\"beth@the-smiths.com\"},\"page\":{\"limit\":3,\"token\":\"$page1_token\"}}")
+# JSON bodies are passed via env vars so quotes/backslashes in PDP responses
+# can't break the Python literal. The heredoc is single-quoted for the same
+# reason on the shell side.
+page2_check=$(PAGE1_RESP="$page1_resp" PAGE2_RESP="$page2_resp" python3 <<'EOF'
+import json, os
+p1 = json.loads(os.environ["PAGE1_RESP"])["results"]
+p2 = json.loads(os.environ["PAGE2_RESP"])
+ids = {r["id"] for r in p1 + p2["results"]}
+next_token = p2.get("page", {}).get("next_token", None)
+print("ok" if len(ids) == 5 and next_token == "" else "bad")
 EOF
 )
 if [ "$page2_check" = "ok" ]; then
-  echo -e "${GREEN}PASS${NC} pagination/page-2 follows token and returns fresh results"
+  echo -e "${GREEN}PASS${NC} pagination/page-2 closes the sequence (5 unique results, empty next_token)"
   PASS=$((PASS+1))
 else
   echo -e "${RED}FAIL${NC} pagination/page-2 unexpected"
-  echo "  Response: $page2_resp"
+  echo "  Page 1: $page1_resp"
+  echo "  Page 2: $page2_resp"
   FAIL=$((FAIL+1))
 fi
 
-# Pagination tamper: replay token with a different resource id -> 400.
+# Pagination tamper: replay the page-1 token but with a different resource
+# id (limit unchanged). The PDP must reject this with 400 because the
+# entities bound to the token no longer match the new request.
 tamper_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${PDP_URL}/access/v1/search/subject" \
   -H "Content-Type: application/json" \
-  -d "{\"subject\":{\"type\":\"user\"},\"action\":{\"name\":\"can_read_user\"},\"resource\":{\"type\":\"user\",\"id\":\"different\"},\"page\":{\"limit\":2,\"token\":\"$page1_token\"}}")
+  -d "{\"subject\":{\"type\":\"user\"},\"action\":{\"name\":\"can_read_user\"},\"resource\":{\"type\":\"user\",\"id\":\"different\"},\"page\":{\"limit\":3,\"token\":\"$page1_token\"}}")
 if [ "$tamper_code" = "400" ]; then
   echo -e "${GREEN}PASS${NC} pagination/tamper detected (400)"
   PASS=$((PASS+1))
