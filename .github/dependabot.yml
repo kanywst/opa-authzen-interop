@@ -1,18 +1,21 @@
 version: 2
 updates:
-  - package-ecosystem: "docker-compose"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Tokyo"
-    commit-message:
-      prefix: "chore"
-      include: "scope"
-    labels:
-      - "dependencies"
-      - "docker"
+  # docker-compose is intentionally disabled: the image tag in docker-compose.yaml
+  # is a shell variable (${PDP_VERSION:-latest}), which Dependabot cannot resolve.
+  # Re-enable once the tag is pinned to a concrete version.
+  # - package-ecosystem: "docker-compose"
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "monday"
+  #     time: "09:00"
+  #     timezone: "Asia/Tokyo"
+  #   commit-message:
+  #     prefix: "chore"
+  #     include: "scope"
+  #   labels:
+  #     - "dependencies"
+  #     - "docker"
 
   - package-ecosystem: "github-actions"
     directory: "/"
