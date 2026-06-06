@@ -364,13 +364,13 @@ MORTY_RICK_OWNED='{"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a09
 MORTY_OWNED='{"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b91","properties":{"ownerID":"morty@the-citadel.com"}}}'
 
 # execute_all: every request runs; results returned in request order.
-test_evaluations '{"subject":{"type":"user","id":"'$MORTY'"},"action":{"name":"can_update_todo"},"options":{"evaluations_semantic":"execute_all"},"evaluations":['"$MORTY_RICK_OWNED"','"$MORTY_OWNED"']}' '[{"decision": false}, {"decision": true}]'
+test_evaluations '{"subject":{"type":"user","id":"'"$MORTY"'"},"action":{"name":"can_update_todo"},"options":{"evaluations_semantic":"execute_all"},"evaluations":['"$MORTY_RICK_OWNED"','"$MORTY_OWNED"']}' '[{"decision": false}, {"decision": true}]'
 
 # deny_on_first_deny: stops at the first deny (rick-owned), so one result only.
-test_evaluations '{"subject":{"type":"user","id":"'$MORTY'"},"action":{"name":"can_update_todo"},"options":{"evaluations_semantic":"deny_on_first_deny"},"evaluations":['"$MORTY_RICK_OWNED"','"$MORTY_OWNED"']}' '[{"decision": false}]'
+test_evaluations '{"subject":{"type":"user","id":"'"$MORTY"'"},"action":{"name":"can_update_todo"},"options":{"evaluations_semantic":"deny_on_first_deny"},"evaluations":['"$MORTY_RICK_OWNED"','"$MORTY_OWNED"']}' '[{"decision": false}]'
 
 # permit_on_first_permit: stops at the first permit (morty-owned), one result.
-test_evaluations '{"subject":{"type":"user","id":"'$MORTY'"},"action":{"name":"can_update_todo"},"options":{"evaluations_semantic":"permit_on_first_permit"},"evaluations":['"$MORTY_OWNED"','"$MORTY_RICK_OWNED"']}' '[{"decision": true}]'
+test_evaluations '{"subject":{"type":"user","id":"'"$MORTY"'"},"action":{"name":"can_update_todo"},"options":{"evaluations_semantic":"permit_on_first_permit"},"evaluations":['"$MORTY_OWNED"','"$MORTY_RICK_OWNED"']}' '[{"decision": true}]'
 
 # --- PDP metadata & transport (AuthZEN spec Sections 9 & 10) ---
 echo ""
@@ -395,7 +395,7 @@ test_status() {
   fi
 }
 
-VALID_EVAL='{"subject":{"type":"user","id":"'$RICK'"},"action":{"name":"can_read_todos"},"resource":{"type":"todo","id":"todo-1"}}'
+VALID_EVAL='{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_read_todos"},"resource":{"type":"todo","id":"todo-1"}}'
 
 # Well-known metadata document (Section 9): validate structure, not the host.
 # Search endpoints are advertised because all three rules are configured.
