@@ -399,8 +399,8 @@ VALID_EVAL='{"subject":{"type":"user","id":"'$RICK'"},"action":{"name":"can_read
 
 # Well-known metadata document (Section 9): validate structure, not the host.
 # Search endpoints are advertised because all three rules are configured.
-wk_resp=$(curl -s "${PDP_URL}/.well-known/authzen-configuration")
-wk_check=$(WK="$wk_resp" python3 <<'EOF'
+if wk_resp=$(curl -s "${PDP_URL}/.well-known/authzen-configuration"); then
+  wk_check=$(WK="$wk_resp" python3 <<'EOF'
 import json, os
 try:
     m = json.loads(os.environ.get("WK", ""))
@@ -420,26 +420,35 @@ except Exception:
     print("bad")
 EOF
 )
-if [ "$wk_check" = "ok" ]; then
-  echo -e "${GREEN}PASS${NC} well-known advertises evaluation + search endpoints (Section 9)"
-  PASS=$((PASS+1))
+  if [ "$wk_check" = "ok" ]; then
+    echo -e "${GREEN}PASS${NC} well-known advertises evaluation + search endpoints (Section 9)"
+    PASS=$((PASS+1))
+  else
+    echo -e "${RED}FAIL${NC} well-known metadata unexpected"
+    echo "  Response: $wk_resp"
+    FAIL=$((FAIL+1))
+  fi
 else
-  echo -e "${RED}FAIL${NC} well-known metadata unexpected"
-  echo "  Response: $wk_resp"
-  FAIL=$((FAIL+1))
+  echo -e "${YELLOW}ERROR${NC} Connection failed [well-known metadata]"
+  ERROR=$((ERROR+1))
 fi
 
 # X-Request-ID echo (Section 10.1.3, MUST): the PDP returns the same id.
 RID="e2e-$(date +%s)-abc"
-echoed=$(curl -s -D - -o /dev/null -X POST "${PDP_URL}/access/v1/evaluation" \
+if echoed_resp=$(curl -s -D - -o /dev/null -X POST "${PDP_URL}/access/v1/evaluation" \
   -H "Content-Type: application/json" -H "X-Request-ID: $RID" \
-  --data-raw "$VALID_EVAL" | tr -d '\r' | awk 'tolower($1) ~ /^x-request-id:/{val=$0; sub(/^[^:]+:[ \t]*/, "", val); print val}')
-if [ "$echoed" = "$RID" ]; then
-  echo -e "${GREEN}PASS${NC} X-Request-ID echoed on response (Section 10.1.3)"
-  PASS=$((PASS+1))
+  --data-raw "$VALID_EVAL" 2>/dev/null); then
+  echoed=$(echo "$echoed_resp" | tr -d '\r' | awk 'tolower($0) ~ /^x-request-id:/{val=$0; sub(/^[^:]+:[ \t]*/, "", val); print val}')
+  if [ "$echoed" = "$RID" ]; then
+    echo -e "${GREEN}PASS${NC} X-Request-ID echoed on response (Section 10.1.3)"
+    PASS=$((PASS+1))
+  else
+    echo -e "${RED}FAIL${NC} X-Request-ID expected '$RID', got '$echoed'"
+    FAIL=$((FAIL+1))
+  fi
 else
-  echo -e "${RED}FAIL${NC} X-Request-ID expected '$RID', got '$echoed'"
-  FAIL=$((FAIL+1))
+  echo -e "${YELLOW}ERROR${NC} Connection failed [X-Request-ID]"
+  ERROR=$((ERROR+1))
 fi
 
 # Transport-level error handling (Section 10.1 / 10.1.2).
