@@ -385,7 +385,7 @@ test_status() {
   [ -n "$ctype" ] && args+=(-H "Content-Type: $ctype")
   [ -n "$body" ] && args+=(--data-raw "$body")
   local code
-  code=$(curl "${args[@]}" 2>/dev/null)
+  code=$(curl "${args[@]}" 2>/dev/null) || { echo -e "${YELLOW}ERROR${NC} Connection failed [${label}]"; ERROR=$((ERROR+1)); return; }
   if [ "$code" = "$expected" ]; then
     echo -e "${GREEN}PASS${NC} $label (HTTP $code)"
     PASS=$((PASS+1))
@@ -403,19 +403,21 @@ wk_resp=$(curl -s "${PDP_URL}/.well-known/authzen-configuration")
 wk_check=$(WK="$wk_resp" python3 <<'EOF'
 import json, os
 try:
-    m = json.loads(os.environ["WK"])
+    m = json.loads(os.environ.get("WK", ""))
+    if not isinstance(m, dict):
+        raise ValueError("response is not a JSON object")
+    checks = [
+        ("access_evaluation_endpoint", "/access/v1/evaluation"),
+        ("access_evaluations_endpoint", "/access/v1/evaluations"),
+        ("search_subject_endpoint", "/access/v1/search/subject"),
+        ("search_resource_endpoint", "/access/v1/search/resource"),
+        ("search_action_endpoint", "/access/v1/search/action"),
+    ]
+    ok = isinstance(m.get("policy_decision_point"), str)
+    ok = ok and all(isinstance(m.get(k), str) and m[k].endswith(suf) for k, suf in checks)
+    print("ok" if ok else "bad")
 except Exception:
-    print("bad"); raise SystemExit
-checks = [
-    ("access_evaluation_endpoint", "/access/v1/evaluation"),
-    ("access_evaluations_endpoint", "/access/v1/evaluations"),
-    ("search_subject_endpoint", "/access/v1/search/subject"),
-    ("search_resource_endpoint", "/access/v1/search/resource"),
-    ("search_action_endpoint", "/access/v1/search/action"),
-]
-ok = isinstance(m.get("policy_decision_point"), str)
-ok = ok and all(isinstance(m.get(k), str) and m[k].endswith(suf) for k, suf in checks)
-print("ok" if ok else "bad")
+    print("bad")
 EOF
 )
 if [ "$wk_check" = "ok" ]; then
@@ -431,7 +433,7 @@ fi
 RID="e2e-$(date +%s)-abc"
 echoed=$(curl -s -D - -o /dev/null -X POST "${PDP_URL}/access/v1/evaluation" \
   -H "Content-Type: application/json" -H "X-Request-ID: $RID" \
-  --data-raw "$VALID_EVAL" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-request-id"{print $2}')
+  --data-raw "$VALID_EVAL" | tr -d '\r' | awk 'tolower($1) ~ /^x-request-id:/{val=$0; sub(/^[^:]+:[ \t]*/, "", val); print val}')
 if [ "$echoed" = "$RID" ]; then
   echo -e "${GREEN}PASS${NC} X-Request-ID echoed on response (Section 10.1.3)"
   PASS=$((PASS+1))
