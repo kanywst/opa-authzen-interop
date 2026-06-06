@@ -438,7 +438,7 @@ RID="e2e-$(date +%s)-abc"
 if echoed_resp=$(curl -s -D - -o /dev/null -X POST "${PDP_URL}/access/v1/evaluation" \
   -H "Content-Type: application/json" -H "X-Request-ID: $RID" \
   --data-raw "$VALID_EVAL" 2>/dev/null); then
-  echoed=$(echo "$echoed_resp" | tr -d '\r' | awk 'tolower($0) ~ /^x-request-id:/{val=$0; sub(/^[^:]+:[ \t]*/, "", val); print val}')
+  echoed=$(printf "%s\n" "$echoed_resp" | tr -d '\r' | awk 'tolower($0) ~ /^x-request-id:/{val=$0; sub(/^[^:]+:[ \t]*/, "", val); print val}')
   if [ "$echoed" = "$RID" ]; then
     echo -e "${GREEN}PASS${NC} X-Request-ID echoed on response (Section 10.1.3)"
     PASS=$((PASS+1))
