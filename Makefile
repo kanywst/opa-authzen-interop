@@ -1,5 +1,8 @@
 PDP_IMAGE := ghcr.io/kanywst/opa-authzen-plugin
-PDP_VERSION := latest
+# Pin to a release that publishes the full API surface (batch evaluations +
+# Search APIs). The `latest` tag currently lags at 0.1.0, which only serves
+# single evaluation, so the Search and batch tests need an explicit version.
+PDP_VERSION := 0.3
 
 .PHONY: test rego-test integration-test up down clean
 
