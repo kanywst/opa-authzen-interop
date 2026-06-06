@@ -1,9 +1,13 @@
 #!/bin/bash
-# Local test script: runs all 40 decision tests against the PDP
+# Local test script: end-to-end AuthZEN conformance checks against the PDP
 # Usage: ./scripts/test-local.sh [pdp-url]
 #
-# This script replays the AuthZEN interop test cases from
-# decisions-authorization-api-1_0-01.json against a running PDP.
+# Replays the AuthZEN interop Todo decision cases (single + batch evaluation)
+# from decisions-authorization-api-1_0-01.json, plus the Search APIs and
+# pagination, and additionally exercises the protocol surface the decision
+# cases don't: evaluation semantics (Section 7.1.2.1), PDP metadata discovery
+# (Section 9), X-Request-ID echo (Section 10.1.3), and transport-level error
+# handling (Section 10.1, Section 11.7).
 
 set -uo pipefail
 
@@ -347,6 +351,110 @@ else
   echo -e "${RED}FAIL${NC} pagination/tamper expected 400, got $tamper_code"
   FAIL=$((FAIL+1))
 fi
+
+# --- Evaluation semantics (AuthZEN spec Section 7.1.2.1) ---
+# options.evaluations_semantic controls short-circuiting. Morty can update a
+# todo he owns (morty-owned -> true) but not one Rick owns (rick-owned ->
+# false), so this true/false pair, ordered per semantic, is enough to show
+# each behaviour distinctly via the length and contents of the result array.
+echo ""
+echo "--- Evaluation semantics ---"
+
+MORTY_RICK_OWNED='{"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b92","properties":{"ownerID":"rick@the-citadel.com"}}}'
+MORTY_OWNED='{"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b91","properties":{"ownerID":"morty@the-citadel.com"}}}'
+
+# execute_all: every request runs; results returned in request order.
+test_evaluations '{"subject":{"type":"user","id":"'$MORTY'"},"action":{"name":"can_update_todo"},"options":{"evaluations_semantic":"execute_all"},"evaluations":['"$MORTY_RICK_OWNED"','"$MORTY_OWNED"']}' '[{"decision": false}, {"decision": true}]'
+
+# deny_on_first_deny: stops at the first deny (rick-owned), so one result only.
+test_evaluations '{"subject":{"type":"user","id":"'$MORTY'"},"action":{"name":"can_update_todo"},"options":{"evaluations_semantic":"deny_on_first_deny"},"evaluations":['"$MORTY_RICK_OWNED"','"$MORTY_OWNED"']}' '[{"decision": false}]'
+
+# permit_on_first_permit: stops at the first permit (morty-owned), one result.
+test_evaluations '{"subject":{"type":"user","id":"'$MORTY'"},"action":{"name":"can_update_todo"},"options":{"evaluations_semantic":"permit_on_first_permit"},"evaluations":['"$MORTY_OWNED"','"$MORTY_RICK_OWNED"']}' '[{"decision": true}]'
+
+# --- PDP metadata & transport (AuthZEN spec Sections 9 & 10) ---
+echo ""
+echo "--- PDP metadata & transport ---"
+
+# test_status asserts only the HTTP status code of a request, for the
+# transport-level behaviours (Section 10) that the decision helpers above
+# don't exercise.
+test_status() {
+  local label="$1" method="$2" path="$3" ctype="$4" body="$5" expected="$6"
+  local args=(-s -o /dev/null -w "%{http_code}" -X "$method" "${PDP_URL}${path}")
+  [ -n "$ctype" ] && args+=(-H "Content-Type: $ctype")
+  [ -n "$body" ] && args+=(--data-raw "$body")
+  local code
+  code=$(curl "${args[@]}" 2>/dev/null)
+  if [ "$code" = "$expected" ]; then
+    echo -e "${GREEN}PASS${NC} $label (HTTP $code)"
+    PASS=$((PASS+1))
+  else
+    echo -e "${RED}FAIL${NC} $label expected $expected, got $code"
+    FAIL=$((FAIL+1))
+  fi
+}
+
+VALID_EVAL='{"subject":{"type":"user","id":"'$RICK'"},"action":{"name":"can_read_todos"},"resource":{"type":"todo","id":"todo-1"}}'
+
+# Well-known metadata document (Section 9): validate structure, not the host.
+# Search endpoints are advertised because all three rules are configured.
+wk_resp=$(curl -s "${PDP_URL}/.well-known/authzen-configuration")
+wk_check=$(WK="$wk_resp" python3 <<'EOF'
+import json, os
+try:
+    m = json.loads(os.environ["WK"])
+except Exception:
+    print("bad"); raise SystemExit
+checks = [
+    ("access_evaluation_endpoint", "/access/v1/evaluation"),
+    ("access_evaluations_endpoint", "/access/v1/evaluations"),
+    ("search_subject_endpoint", "/access/v1/search/subject"),
+    ("search_resource_endpoint", "/access/v1/search/resource"),
+    ("search_action_endpoint", "/access/v1/search/action"),
+]
+ok = isinstance(m.get("policy_decision_point"), str)
+ok = ok and all(isinstance(m.get(k), str) and m[k].endswith(suf) for k, suf in checks)
+print("ok" if ok else "bad")
+EOF
+)
+if [ "$wk_check" = "ok" ]; then
+  echo -e "${GREEN}PASS${NC} well-known advertises evaluation + search endpoints (Section 9)"
+  PASS=$((PASS+1))
+else
+  echo -e "${RED}FAIL${NC} well-known metadata unexpected"
+  echo "  Response: $wk_resp"
+  FAIL=$((FAIL+1))
+fi
+
+# X-Request-ID echo (Section 10.1.3, MUST): the PDP returns the same id.
+RID="e2e-$(date +%s)-abc"
+echoed=$(curl -s -D - -o /dev/null -X POST "${PDP_URL}/access/v1/evaluation" \
+  -H "Content-Type: application/json" -H "X-Request-ID: $RID" \
+  --data-raw "$VALID_EVAL" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-request-id"{print $2}')
+if [ "$echoed" = "$RID" ]; then
+  echo -e "${GREEN}PASS${NC} X-Request-ID echoed on response (Section 10.1.3)"
+  PASS=$((PASS+1))
+else
+  echo -e "${RED}FAIL${NC} X-Request-ID expected '$RID', got '$echoed'"
+  FAIL=$((FAIL+1))
+fi
+
+# Transport-level error handling (Section 10.1 / 10.1.2).
+test_status "well-known GET returns 200"         GET  "/.well-known/authzen-configuration" ""                 ""            200
+test_status "wrong Content-Type rejected"        POST "/access/v1/evaluation"              "text/plain"       "$VALID_EVAL" 400
+test_status "malformed JSON body rejected"       POST "/access/v1/evaluation"              "application/json" '{"subject":' 400
+test_status "missing required resource rejected" POST "/access/v1/evaluation"              "application/json" '{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_read_todos"}}' 400
+
+# Batch over the 100-evaluation limit must be rejected with 413 (Section 11.7).
+over_body=$(RICK="$RICK" python3 <<'EOF'
+import json, os
+evals = [{"resource": {"type": "todo", "id": f"todo-{i}"}} for i in range(101)]
+print(json.dumps({"subject": {"type": "user", "id": os.environ["RICK"]},
+                  "action": {"name": "can_read_todos"}, "evaluations": evals}))
+EOF
+)
+test_status "batch over 100 evaluations rejected" POST "/access/v1/evaluations" "application/json" "$over_body" 413
 
 # --- Summary ---
 echo ""
