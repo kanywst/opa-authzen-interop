@@ -1,0 +1,73 @@
+name: CI
+
+# The policy in policy/ is the product of this repo, and until this workflow
+# existed nothing here verified it: opa-authzen-plugin's own CI clones this
+# repo and runs `make integration-test` against a freshly built image, so a
+# broken rule was caught over there, on the plugin's schedule, against main
+# rather than against the pull request that broke it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned rather than floating so a policy that stops parsing under a new OPA
+  # release fails in a commit that names the version, not in an unrelated one.
+  OPA_VERSION: v1.19.1
+
+jobs:
+  rego:
+    name: Rego check, fmt, and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install OPA
+        run: |
+          curl -fsSL -o /usr/local/bin/opa \
+            "https://openpolicyagent.org/downloads/${OPA_VERSION}/opa_linux_amd64_static"
+          chmod +x /usr/local/bin/opa
+          opa version
+
+      - name: Check policy compiles against the data
+        run: opa check policy/ data/
+
+      - name: Check formatting
+        run: opa fmt --fail --diff policy/
+
+      - name: Unit tests
+        run: opa test policy/ data/ -v
+
+  e2e:
+    name: Integration tests against the PDP
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Pulls ghcr.io/kanywst/opa-authzen-plugin at the version pinned in the
+      # Makefile, runs scripts/test-local.sh against it, and stops the PDP.
+      # The image is public, so no registry login is needed.
+      - name: Integration tests
+        run: make integration-test
+
+      - name: PDP logs on failure
+        if: failure()
+        run: docker compose logs --no-color
