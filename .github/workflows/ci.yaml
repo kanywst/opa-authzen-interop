@@ -1,10 +1,7 @@
 name: CI
 
-# The policy in policy/ is the product of this repo, and until this workflow
-# existed nothing here verified it: opa-authzen-plugin's own CI clones this
-# repo and runs `make integration-test` against a freshly built image, so a
-# broken rule was caught over there, on the plugin's schedule, against main
-# rather than against the pull request that broke it.
+# Until this existed, nothing here ran the tests: a broken rule surfaced in
+# opa-authzen-plugin's CI, against main rather than the pull request.
 
 on:
   push:
@@ -19,8 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Pinned rather than floating so a policy that stops parsing under a new OPA
-  # release fails in a commit that names the version, not in an unrelated one.
+  # Pinned so an OPA release that breaks the policy fails in a commit that
+  # names the version.
   OPA_VERSION: v1.19.1
 
 jobs:
@@ -62,9 +59,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # Pulls ghcr.io/kanywst/opa-authzen-plugin at the version pinned in the
-      # Makefile, runs scripts/test-local.sh against it, and stops the PDP.
-      # The image is public, so no registry login is needed.
+      # Pulls the public image pinned in the Makefile, so no registry login.
       - name: Integration tests
         run: make integration-test
 
