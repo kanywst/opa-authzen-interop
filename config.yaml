@@ -2,6 +2,11 @@ plugins:
   authzen:
     path: "authzen"
     decision: "allow"
+    # Decision context (spec Section 5.5.1). Names a Rego rule in the `authzen`
+    # package whose object value is returned as the Decision's optional
+    # `context` member. Used here to convey a machine-readable reason for every
+    # decision and to carry obligations (see `supported_obligations` below).
+    decision_context: "decision_context"
     # AuthZEN Search APIs (spec Section 8). Each field names a Rego rule in
     # the `authzen` package that returns the set of permitted entities for
     # a partial input. Omit a field to disable the corresponding endpoint.
@@ -9,3 +14,17 @@ plugins:
       subject: "subject_search"
       resource: "resource_search"
       action: "action_search"
+    # PDP capability URNs advertised in the metadata document (spec Section
+    # 9.1.2). The AuthZEN core registers no URNs of its own — the IANA registry
+    # is populated by profiles and vendors — so this value is operator-supplied.
+    # This deployment advertises only what it actually is: the Todo interop PDP.
+    capabilities:
+      - "urn:kanywst:authzen:capability:todo-interop"
+    # AuthZEN Obligations Profile 1.0. Lists the Obligation Types this PDP may
+    # issue, which the plugin both advertises in the metadata document and uses
+    # to filter a PEP's declared `context.supported_obligations` before the
+    # policy sees it. Only `notification` is listed because `obligation_context`
+    # in policy/authzen.rego issues nothing else — advertising a type the policy
+    # never emits would tell a PEP to prepare for work that never arrives.
+    supported_obligations:
+      - "notification"
