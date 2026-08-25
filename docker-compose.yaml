@@ -1,6 +1,6 @@
 services:
   pdp:
-    image: ${PDP_IMAGE:-ghcr.io/kanywst/opa-authzen-plugin}:${PDP_VERSION:-0.3}
+    image: ${PDP_IMAGE:-ghcr.io/kanywst/opa-authzen-plugin}:${PDP_VERSION:-0.6}
     ports:
       - "8181:8181"
     volumes:
