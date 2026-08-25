@@ -348,3 +348,141 @@ test_resource_search_cross_type_returns_empty if {
 	}
 	count(result) == 0
 }
+
+# --- Decision context (spec Section 5.5.1) ---
+
+morty_todo := "7240d0db-8ff0-41ec-98b2-34a096273b91"
+
+rick_todo := "7240d0db-8ff0-41ec-98b2-34a096273b92"
+
+# A permit carries the "permitted" reason and nothing else when the PEP
+# declared no obligation support.
+test_decision_context_reason_on_permit if {
+	ctx := authzen.decision_context with input as {
+		"subject": {"type": "user", "id": rick_pid},
+		"action": {"name": "can_read_todos"},
+		"resource": {"type": "todo", "id": rick_todo},
+	}
+	ctx == {"reason": "permitted"}
+}
+
+test_decision_context_reason_on_deny if {
+	ctx := authzen.decision_context with input as {
+		"subject": {"type": "user", "id": beth_pid},
+		"action": {"name": "can_create_todo"},
+		"resource": {"type": "todo", "id": "todo-1"},
+	}
+	ctx == {"reason": "not_permitted"}
+}
+
+test_decision_context_reason_on_unknown_subject if {
+	ctx := authzen.decision_context with input as {
+		"subject": {"type": "user", "id": "no-such-pid"},
+		"action": {"name": "can_read_todos"},
+		"resource": {"type": "todo", "id": rick_todo},
+	}
+	ctx == {"reason": "unknown_subject"}
+}
+
+# --- Obligations Profile 1.0 ---
+
+# Rick (admin) updating a todo Morty owns: the owner must be notified, and
+# the PEP said it can execute `notification`.
+test_notification_obligation_on_privileged_cross_owner_update if {
+	ctx := authzen.decision_context with input as {
+		"subject": {"type": "user", "id": rick_pid},
+		"action": {"name": "can_update_todo"},
+		"resource": {
+			"type": "todo",
+			"id": morty_todo,
+			"properties": {"ownerID": "morty@the-citadel.com"},
+		},
+		"context": {"supported_obligations": ["notification"]},
+	}
+	ctx.reason == "permitted"
+	ctx.obligations == [{
+		"id": sprintf("notify-owner-%s", [morty_todo]),
+		"type": "notification",
+		"properties": {
+			"recipient": "morty@the-citadel.com",
+			"event": "can_update_todo",
+			"actor": "rick@the-citadel.com",
+		},
+	}]
+}
+
+# Same request, but the PEP declared nothing. The profile's negotiation rule
+# says the PDP must not issue an obligation the PEP cannot execute.
+test_no_obligation_when_pep_declares_nothing if {
+	ctx := authzen.decision_context with input as {
+		"subject": {"type": "user", "id": rick_pid},
+		"action": {"name": "can_update_todo"},
+		"resource": {
+			"type": "todo",
+			"id": morty_todo,
+			"properties": {"ownerID": "morty@the-citadel.com"},
+		},
+	}
+	not ctx.obligations
+}
+
+# A PEP that declared only types this PDP does not advertise arrives at the
+# policy with an empty array (the plugin filters it). Still no obligation.
+test_no_obligation_when_declared_set_filters_to_empty if {
+	ctx := authzen.decision_context with input as {
+		"subject": {"type": "user", "id": rick_pid},
+		"action": {"name": "can_update_todo"},
+		"resource": {
+			"type": "todo",
+			"id": morty_todo,
+			"properties": {"ownerID": "morty@the-citadel.com"},
+		},
+		"context": {"supported_obligations": []},
+	}
+	not ctx.obligations
+	ctx.negotiated_obligations == []
+}
+
+# Acting on your own todo creates no duty to notify anyone.
+test_no_obligation_on_own_todo if {
+	ctx := authzen.decision_context with input as {
+		"subject": {"type": "user", "id": rick_pid},
+		"action": {"name": "can_update_todo"},
+		"resource": {
+			"type": "todo",
+			"id": rick_todo,
+			"properties": {"ownerID": "rick@the-citadel.com"},
+		},
+		"context": {"supported_obligations": ["notification"]},
+	}
+	not ctx.obligations
+}
+
+# A denied request carries no obligation: there is no enforcement to attach a
+# duty to.
+test_no_obligation_on_deny if {
+	ctx := authzen.decision_context with input as {
+		"subject": {"type": "user", "id": beth_pid},
+		"action": {"name": "can_update_todo"},
+		"resource": {
+			"type": "todo",
+			"id": rick_todo,
+			"properties": {"ownerID": "rick@the-citadel.com"},
+		},
+		"context": {"supported_obligations": ["notification"]},
+	}
+	not ctx.obligations
+	ctx.reason == "not_permitted"
+}
+
+# The negotiated set is echoed so a PEP (and the e2e suite) can see what
+# survived the plugin's filter.
+test_negotiation_context_echoes_declared_set if {
+	ctx := authzen.decision_context with input as {
+		"subject": {"type": "user", "id": morty_pid},
+		"action": {"name": "can_read_todos"},
+		"resource": {"type": "todo", "id": rick_todo},
+		"context": {"supported_obligations": ["notification"]},
+	}
+	ctx.negotiated_obligations == ["notification"]
+}
