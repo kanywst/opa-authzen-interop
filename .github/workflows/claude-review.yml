@@ -77,10 +77,9 @@ jobs:
             This repo implements the OpenID AuthZEN interop Todo scenario as an OPA and Rego
             PDP, with policy under policy/ and fixtures under data/.
 
-            There is no CI here beyond what GitHub runs by default, so this review is the
-            only check.
-
-            Look for what only a reader can catch:
+            CI already answers whether the policy compiles, is formatted, passes its Rego
+            unit tests, and passes the end-to-end suite against a real PDP. Do not re-derive
+            any of that. Look for what only a reader can catch:
 
             1. Conformance to the published interop scenario. The whole point is producing
                the same decisions as every other implementation, so a subject, resource,
