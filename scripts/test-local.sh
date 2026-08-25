@@ -373,19 +373,14 @@ test_evaluations '{"subject":{"type":"user","id":"'"$MORTY"'"},"action":{"name":
 test_evaluations '{"subject":{"type":"user","id":"'"$MORTY"'"},"action":{"name":"can_update_todo"},"options":{"evaluations_semantic":"permit_on_first_permit"},"evaluations":['"$MORTY_OWNED"','"$MORTY_RICK_OWNED"']}' '[{"decision": true}]'
 
 # --- Decision context & Obligations Profile (Section 5.5.1 + profile) ---
-# config.yaml points `decision_context` at the policy's rule of the same name,
-# so every Decision carries a machine-readable reason, and opts the PDP into
-# the Obligations Profile 1.0 by advertising the `notification` type.
 echo ""
 echo "--- Decision context & obligations ---"
 
 MORTY_TODO="7240d0db-8ff0-41ec-98b2-34a096273b91"
 
-# test_decision_context posts an evaluation and compares the response's
-# OPTIONAL `context` member against an expected JSON object. An empty expected
-# value asserts the member is absent. The comparison is structural, so key
-# order and whitespace in either side are irrelevant. Bodies travel through
-# env vars so quotes in a PDP response can't break the Python literal.
+# test_decision_context compares the response's OPTIONAL `context` member
+# against an expected JSON object; an empty expected value asserts it is
+# absent. Structural comparison, so key order does not matter.
 test_decision_context() {
   local label="$1" request="$2" expected="$3"
 
@@ -442,25 +437,21 @@ test_decision_context "obligations/notification issued on cross-owner update" \
   '{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_update_todo"},"resource":{"type":"todo","id":"'"$MORTY_TODO"'","properties":{"ownerID":"morty@the-citadel.com"}},"context":{"supported_obligations":["notification"]}}' \
   '{"reason":"permitted","negotiated_obligations":["notification"],"obligations":[{"id":"notify-owner-'"$MORTY_TODO"'","type":"notification","properties":{"recipient":"morty@the-citadel.com","event":"can_update_todo","actor":"rick@the-citadel.com"}}]}'
 
-# Same decision, PEP silent: the profile forbids issuing an obligation the PEP
-# never said it could execute, and an absent member is "no information", so
-# `negotiated_obligations` is absent too rather than empty.
+# PEP silent: no obligation, and an absent member stays absent rather than
+# becoming an empty array.
 test_decision_context "obligations/none when PEP declares nothing" \
   '{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_update_todo"},"resource":{"type":"todo","id":"'"$MORTY_TODO"'","properties":{"ownerID":"morty@the-citadel.com"}},"context":{}}' \
   '{"reason":"permitted"}'
 
-# Negotiation filter (v0.6): the PEP declares one advertised type and one this
-# PDP never advertised. The plugin MUST drop the unadvertised value before the
-# policy sees it, so the echoed set is exactly ["notification"] — this asserts
-# the filter from outside the PDP, which is the only place it is observable.
+# The plugin MUST drop a type it never advertised before the policy sees it,
+# so the echoed set is exactly ["notification"]. Fails against an unfiltered
+# PDP, which echoes carrier-pigeon back.
 test_decision_context "obligations/unadvertised type filtered out" \
   '{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_update_todo"},"resource":{"type":"todo","id":"'"$MORTY_TODO"'","properties":{"ownerID":"morty@the-citadel.com"}},"context":{"supported_obligations":["notification","carrier-pigeon"]}}' \
   '{"reason":"permitted","negotiated_obligations":["notification"],"obligations":[{"id":"notify-owner-'"$MORTY_TODO"'","type":"notification","properties":{"recipient":"morty@the-citadel.com","event":"can_update_todo","actor":"rick@the-citadel.com"}}]}'
 
-# A PEP declaring only types this PDP does not advertise filters down to an
-# empty array. The profile keeps the emptied member (the PEP did say
-# something) and no obligation is issued. `step-up` is a registered type, so
-# this distinguishes "not advertised by this PDP" from "not a real type".
+# `step-up` is a registered type but not advertised here, so it filters down
+# to an empty array, which the profile keeps rather than deletes.
 test_decision_context "obligations/declared set filtered to empty" \
   '{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_update_todo"},"resource":{"type":"todo","id":"'"$MORTY_TODO"'","properties":{"ownerID":"morty@the-citadel.com"}},"context":{"supported_obligations":["step-up"]}}' \
   '{"reason":"permitted","negotiated_obligations":[]}'
@@ -470,8 +461,8 @@ test_decision_context "obligations/none on own todo" \
   '{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_update_todo"},"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b92","properties":{"ownerID":"rick@the-citadel.com"}},"context":{"supported_obligations":["notification"]}}' \
   '{"reason":"permitted","negotiated_obligations":["notification"]}'
 
-# Decision context also rides on each result of the batch endpoint. Rick's two
-# evaluations differ in owner, so only the cross-owner one carries a duty.
+# Per-evaluation context on the batch endpoint: only the cross-owner one
+# carries a duty.
 batch_ctx_resp=$(curl -s -X POST "${PDP_URL}/access/v1/evaluations" \
   -H "Content-Type: application/json" \
   -d '{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_update_todo"},"context":{"supported_obligations":["notification"]},"evaluations":[{"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b92","properties":{"ownerID":"rick@the-citadel.com"}}},{"resource":{"type":"todo","id":"'"$MORTY_TODO"'","properties":{"ownerID":"morty@the-citadel.com"}}}]}')
@@ -526,9 +517,8 @@ VALID_EVAL='{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_re
 
 # Well-known metadata document (Section 9): validate structure, not the host.
 # Search endpoints are advertised because all three rules are configured.
-# `capabilities` (Section 9.1.2) and `supported_obligations` (Obligations
-# Profile 1.0, "Discovery: PDP Metadata Extension") come from config.yaml, and
-# are what a PEP reads to learn what this PDP can be asked to do.
+# `capabilities` (Section 9.1.2) and `supported_obligations` come from
+# config.yaml.
 if wk_resp=$(curl -s "${PDP_URL}/.well-known/authzen-configuration"); then
   wk_check=$(WK="$wk_resp" python3 <<'EOF'
 import json, os

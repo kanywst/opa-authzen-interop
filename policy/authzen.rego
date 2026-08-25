@@ -144,16 +144,12 @@ action_search contains {"name": name} if {
 }
 
 # --- Decision context (spec Section 5.5.1) ----------------------------------
-# `decision_context` in config.yaml points the plugin at this rule. Its object
-# value is returned as the Decision's OPTIONAL `context` member on both
-# /access/v1/evaluation and each result of /access/v1/evaluations. The plugin
-# omits `context` when the rule is undefined or yields an empty object, so the
-# rule is composed from parts that each default to `{}`.
+# Named by `decision_context` in config.yaml and returned as the Decision's
+# OPTIONAL `context` member. Composed from parts that each default to `{}`,
+# since the plugin omits `context` on an empty object.
 
 decision_context := object.union_n([reason_context, obligation_context, negotiation_context])
 
-# Why the decision came out the way it did. A short stable token rather than
-# prose, so a PEP can branch on it without parsing English.
 default reason := "not_permitted"
 
 # `allow` requires a resolved `user` in every branch, so these two overrides
@@ -165,16 +161,10 @@ reason := "permitted" if allow
 reason_context := {"reason": reason}
 
 # --- AuthZEN Obligations Profile 1.0 ----------------------------------------
-# An obligation is a duty the PEP MUST discharge when it enforces the decision.
-# The one this scenario models: when a privileged subject (admin or
-# evil_genius) mutates a todo somebody else owns, the owner has to be told.
-# That is a real duty attached to a permit, not a hint attached to a deny.
-#
-# The membership test on `input.context.supported_obligations` is the profile's
-# negotiation rule: issue an obligation only if the PEP declared it can execute
-# it. The plugin has already filtered that array down to the types listed under
-# `supported_obligations` in config.yaml, so anything still present here is a
-# type this PDP is configured to issue.
+# A privileged subject mutating somebody else's todo owes the owner a
+# notification. The membership test is the profile's negotiation rule: only
+# issue what the PEP declared it can execute. The plugin has already filtered
+# that array down to config.yaml's `supported_obligations`.
 
 default obligation_context := {}
 
@@ -193,11 +183,8 @@ obligation_context := {"obligations": [{
 	"notification" in input.context.supported_obligations
 }
 
-# Echo back the obligation types that survived the plugin's negotiation filter.
-# A PEP can use this to confirm which of the types it declared this PDP will
-# actually honour, and the e2e suite uses it to observe the filter from the
-# outside. Absent when the PEP declared nothing, matching the profile's
-# distinction between "declared none" and "said nothing".
+# Echoes what survived that filter, which is otherwise unobservable over HTTP
+# and so untestable. Absent when the PEP declared nothing.
 default negotiation_context := {}
 
 negotiation_context := {"negotiated_obligations": input.context.supported_obligations} if {
