@@ -1,8 +1,11 @@
 version: 2
 updates:
   # docker-compose is intentionally disabled: the image tag in docker-compose.yaml
-  # is a shell variable (${PDP_VERSION:-latest}), which Dependabot cannot resolve.
-  # Re-enable once the tag is pinned to a concrete version.
+  # is a shell variable (${PDP_VERSION:-0.6}), which Dependabot cannot resolve.
+  # The variable is not an oversight to be tidied away — opa-authzen-plugin's CI
+  # clones this repo and overrides PDP_IMAGE/PDP_VERSION to test the image it
+  # just built, so hardcoding the tag would break the thing this repo exists for.
+  # Bumping the pin is therefore part of the periodic review, not Dependabot's job.
   # - package-ecosystem: "docker-compose"
   #   directory: "/"
   #   schedule:
