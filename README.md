@@ -7,6 +7,8 @@ The AuthZEN API endpoints are provided by [opa-authzen-plugin](https://github.co
 - **Interop site:** [authzen-interop.net](https://authzen-interop.net)
 - **Test harness:** [openid/authzen/interop/authzen-todo-backend](https://github.com/openid/authzen/tree/main/interop/authzen-todo-backend)
 
+Requires opa-authzen-plugin **0.6 or newer**: the config here enables Search (0.3), capability URNs in the PDP metadata (0.4), decision context (0.5), and the Obligations Profile (0.6).
+
 ## Usage
 
 ### Quick start
@@ -54,100 +56,6 @@ cd opa-authzen-interop
 ./scripts/test-local.sh
 ```
 
-## Test results
-
-All tests pass.
-
-<details>
-<summary>test-local.sh output</summary>
-
-```
-=== AuthZEN Interop Test Suite ===
-PDP URL: http://localhost:8181
-
---- Rick Sanchez (admin, evil_genius) ---
-PASS can_read_user subject=CiRmZDA2MTRk... -> N/A
-PASS can_read_user subject=CiRmZDA2MTRk... -> N/A
-PASS can_read_todos subject=CiRmZDA2MTRk... -> N/A
-PASS can_create_todo subject=CiRmZDA2MTRk... -> N/A
-PASS can_update_todo subject=CiRmZDA2MTRk... -> rick@the-citadel.com
-PASS can_update_todo subject=CiRmZDA2MTRk... -> morty@the-citadel.com
-PASS can_delete_todo subject=CiRmZDA2MTRk... -> rick@the-citadel.com
-PASS can_delete_todo subject=CiRmZDA2MTRk... -> morty@the-citadel.com
-
---- Morty Smith (editor) ---
-PASS can_read_user subject=CiRmZDE2MTRk... -> N/A
-PASS can_read_user subject=CiRmZDE2MTRk... -> N/A
-PASS can_read_todos subject=CiRmZDE2MTRk... -> N/A
-PASS can_create_todo subject=CiRmZDE2MTRk... -> N/A
-PASS can_update_todo subject=CiRmZDE2MTRk... -> rick@the-citadel.com
-PASS can_update_todo subject=CiRmZDE2MTRk... -> morty@the-citadel.com
-PASS can_delete_todo subject=CiRmZDE2MTRk... -> rick@the-citadel.com
-PASS can_delete_todo subject=CiRmZDE2MTRk... -> morty@the-citadel.com
-
---- Summer Smith (editor) ---
-PASS can_read_user subject=CiRmZDI2MTRk... -> N/A
-PASS can_read_user subject=CiRmZDI2MTRk... -> N/A
-PASS can_read_todos subject=CiRmZDI2MTRk... -> N/A
-PASS can_create_todo subject=CiRmZDI2MTRk... -> N/A
-PASS can_update_todo subject=CiRmZDI2MTRk... -> rick@the-citadel.com
-PASS can_update_todo subject=CiRmZDI2MTRk... -> summer@the-smiths.com
-PASS can_delete_todo subject=CiRmZDI2MTRk... -> rick@the-citadel.com
-PASS can_delete_todo subject=CiRmZDI2MTRk... -> summer@the-smiths.com
-
---- Beth Smith (viewer) ---
-PASS can_read_user subject=CiRmZDM2MTRk... -> N/A
-PASS can_read_user subject=CiRmZDM2MTRk... -> N/A
-PASS can_read_todos subject=CiRmZDM2MTRk... -> N/A
-PASS can_create_todo subject=CiRmZDM2MTRk... -> N/A
-PASS can_update_todo subject=CiRmZDM2MTRk... -> rick@the-citadel.com
-PASS can_update_todo subject=CiRmZDM2MTRk... -> beth@the-smiths.com
-PASS can_delete_todo subject=CiRmZDM2MTRk... -> rick@the-citadel.com
-PASS can_delete_todo subject=CiRmZDM2MTRk... -> beth@the-smiths.com
-
---- Jerry Smith (viewer) ---
-PASS can_read_user subject=CiRmZDQ2MTRk... -> N/A
-PASS can_read_user subject=CiRmZDQ2MTRk... -> N/A
-PASS can_read_todos subject=CiRmZDQ2MTRk... -> N/A
-PASS can_create_todo subject=CiRmZDQ2MTRk... -> N/A
-PASS can_update_todo subject=CiRmZDQ2MTRk... -> rick@the-citadel.com
-PASS can_update_todo subject=CiRmZDQ2MTRk... -> jerry@the-smiths.com
-PASS can_delete_todo subject=CiRmZDQ2MTRk... -> rick@the-citadel.com
-PASS can_delete_todo subject=CiRmZDQ2MTRk... -> jerry@the-smiths.com
-
---- Batch Evaluations ---
-PASS [batch] can_update_todo subject=CiRmZDA2MTRk... evaluations=2
-PASS [batch] can_update_todo subject=CiRmZDE2MTRk... evaluations=2
-PASS [batch] can_update_todo subject=CiRmZDQ2MTRk... evaluations=2
-
---- Search APIs ---
-PASS subject_search/can_read_user -> 5 result(s)
-PASS subject_search/can_create_todo -> 3 result(s)
-PASS subject_search/can_update_todo on Rick-owned -> 1 result(s)
-PASS resource_search/Rick can_update_todo -> 4 result(s)
-PASS resource_search/Morty can_update_todo -> 1 result(s)
-PASS resource_search/Beth can_update_todo -> 0 result(s)
-PASS resource_search/Rick can_read_user (type=user) -> 5 result(s)
-PASS resource_search/unknown type returns empty -> 0 result(s)
-PASS action_search/Rick on own todo (todo-scoped only) -> 4 result(s)
-PASS action_search/Rick on user resource (user-scoped only) -> 1 result(s)
-PASS action_search/Morty on Rick's todo -> 2 result(s)
-PASS action_search/Beth on own todo -> 1 result(s)
-PASS resource_search/cross-type leak guarded -> 0 result(s)
-PASS subject_search/non-user type returns empty -> 0 result(s)
-
---- Search pagination ---
-PASS pagination/page-1 returned 3 + non-empty next_token
-PASS pagination/page-2 closes the sequence (5 unique results, empty next_token)
-PASS pagination/tamper detected (400)
-
-=== Results ===
-Total: 60  Pass: 60  Fail: 0  Error: 0
-All tests passed!
-```
-
-</details>
-
 ## Todo scenario
 
 5 users (Rick & Morty themed) and 5 authorization actions. See [Todo interop scenario](https://authzen-interop.net/docs/scenarios/todo-1.1/) for request/response details.
@@ -173,10 +81,57 @@ All tests passed!
 
 The Search APIs are enabled via the `search` block in `config.yaml`, which points the plugin at the `subject_search`, `resource_search`, and `action_search` rules in `policy/authzen.rego`. Pagination is supported via the opaque `page.next_token`.
 
+The metadata document also advertises a `capabilities` array (spec Section 9.1.2) and a `supported_obligations` array (Obligations Profile 1.0), both sourced from `config.yaml`.
+
+## Decision context and obligations
+
+`config.yaml` sets `decision_context: decision_context`, so every Decision carries the optional `context` member (spec Section 5.5.1) built by the rule of the same name in `policy/authzen.rego`. It always includes a short machine-readable `reason` — `permitted`, `not_permitted`, or `unknown_subject` — so a PEP can branch without parsing prose.
+
+The scenario also implements the [AuthZEN Obligations Profile 1.0](https://openid.github.io/authzen/authzen-obligations-profile-1_0.html). When a privileged subject (admin or `evil_genius`) updates or deletes a todo somebody else owns, the permit carries a `notification` obligation naming the owner to be told:
+
+```json
+{
+  "decision": true,
+  "context": {
+    "reason": "permitted",
+    "negotiated_obligations": ["notification"],
+    "obligations": [{
+      "id": "notify-owner-7240d0db-8ff0-41ec-98b2-34a096273b91",
+      "type": "notification",
+      "properties": {
+        "recipient": "morty@the-citadel.com",
+        "event": "can_update_todo",
+        "actor": "rick@the-citadel.com"
+      }
+    }]
+  }
+}
+```
+
+The profile requires a PDP to ignore any Obligation Type in the PEP's `context.supported_obligations` that it did not itself advertise. `supported_obligations` in `config.yaml` lists only `notification`, so the plugin filters the declared array down to that set before the policy runs, and the policy issues the obligation only when `notification` survives. `negotiated_obligations` echoes what survived, which is how the e2e suite observes the filter from outside the PDP.
+
+## Test coverage
+
+`./scripts/test-local.sh` replays the interop decision cases and additionally exercises the protocol surface those cases don't reach. Against opa-authzen-plugin 0.6:
+
+| Area                             | Spec reference          | Assertions |
+| -------------------------------- | ----------------------- | ---------: |
+| Per-user decision cases (5 users) | Section 5               |         40 |
+| Batch evaluations                | Section 7.1             |          3 |
+| Search APIs                      | Section 8               |         14 |
+| Search pagination                | Section 8.5             |          3 |
+| Evaluation semantics             | Section 7.1.2.1         |          3 |
+| Decision context and obligations | Section 5.5.1 + profile |          9 |
+| PDP metadata and transport       | Sections 9, 10, 11.7    |          7 |
+| **Total**                        |                         |     **79** |
+
+Rego unit tests (`make rego-test`) cover the same policy rules without a running PDP: 40 tests.
+
 ## References
 
 - [OpenID AuthZEN Working Group](https://openid.net/wg/authzen/)
 - [Authorization API 1.0 spec](https://openid.github.io/authzen/)
+- [AuthZEN Obligations Profile 1.0](https://openid.github.io/authzen/authzen-obligations-profile-1_0.html)
 - [AuthZEN Interop Results](https://authzen-interop.net)
 - [openid/authzen](https://github.com/openid/authzen)
 - [opa-authzen-plugin](https://github.com/kanywst/opa-authzen-plugin)
