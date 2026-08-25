@@ -2,7 +2,8 @@ name: Claude review
 
 # CI answers "does it build and do the tests pass". This asks the question no
 # script here can. It reviews, it does not gate: nothing here is a required
-# check.
+# check, and a red run means the review did not happen, never that the code is
+# wrong — the findings are comments on the pull request.
 #
 # The action refuses to run when this file differs from the copy on the default
 # branch, so a pull request cannot rewrite its own reviewer. The cost is that
@@ -27,15 +28,18 @@ concurrency:
 jobs:
   review:
     # A pull request from a fork gets no secrets, so the job would fail on
-    # authentication rather than say anything useful. Dependabot is same-repo but
-    # is handed dependabot secrets rather than the repository's, so it would fail
-    # the token check and paint every dependency bump red; the type check keeps
-    # every bot out for the same reason. Drafts are skipped until they are marked
-    # ready, which is what the ready_for_review trigger is for.
+    # authentication rather than say anything useful. A run triggered by
+    # Dependabot is the same problem by another route: it reads the Dependabot
+    # secret store rather than the Actions one, so the token is empty there
+    # regardless of the branch living in this repository. The test is on the
+    # actor and not the pull request author, because a human reopening a
+    # Dependabot pull request does get the secrets and is worth reviewing.
+    # Drafts are skipped until they are marked ready, which is what the
+    # ready_for_review trigger is for.
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.user.type == 'User' &&
-      github.event.pull_request.draft == false
+      github.event.pull_request.draft == false &&
+      github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -65,7 +69,21 @@ jobs:
             exit 1
           fi
 
+      # Snapshotted before the review so the check below can tell whether this
+      # run added anything, rather than seeing another bot's comment and
+      # concluding the review landed.
+      - name: Count comments before the review
+        id: before
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          n=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --jq 'length')
+          m=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/comments" --jq 'length')
+          echo "count=$((n + m))" >> "$GITHUB_OUTPUT"
+
       - uses: anthropics/claude-code-action@dcb57747bfceeaa1fa72638cae52295d1d853d4a # v1
+        id: claude
         with:
           # A subscription token, not an API key: runs against the Claude plan
           # instead of API credits. Generate it with `claude setup-token`.
@@ -75,7 +93,9 @@ jobs:
             PR: ${{ github.event.pull_request.number }}
 
             This repo implements the OpenID AuthZEN interop Todo scenario as an OPA and Rego
-            PDP, with policy under policy/ and fixtures under data/.
+            PDP, with policy under policy/ and fixtures under data/. It is also the
+            end-to-end harness for kanywst/opa-authzen-plugin, whose CI clones this repo and
+            runs `make integration-test` against a freshly built image.
 
             CI already answers whether the policy compiles, is formatted, passes its Rego
             unit tests, and passes the end-to-end suite against a real PDP. Do not re-derive
@@ -98,15 +118,70 @@ jobs:
                thing standing between a refactor and a wrong decision.
 
             5. AuthZEN request and response shapes, which come from the 1.0 specification
-               rather than from what is convenient here.
+               and its profiles rather than from what is convenient here. This now includes
+               decision context (Section 5.5.1) and the Obligations Profile, where the
+               shapes are easy to get subtly wrong and still parse.
 
-            Post findings as inline comments on the lines they concern. Use one
-            top-level comment for the summary, posted with
-            `gh pr comment --edit-last --create-if-none` so that a re-review
-            replaces the previous summary rather than stacking another one
-            underneath it. Be specific and cite
-            `file:line`. If the diff is clean against all of the above, say so
-            in one line rather than manufacturing nits.
+            6. A test that cannot fail. This suite asserts plugin behaviour it does not
+               control, so an assertion that would pass against a PDP doing nothing is worse
+               than no assertion: check each new test has a way to go red.
 
+            Nobody reads your reply. The only output that reaches a human is what
+            you post to the pull request, so every run ends with a posted comment,
+            including a run that finds nothing.
+
+            Post findings as inline comments on the lines they concern, then close
+            with exactly one top-level `gh pr comment`, sent with
+            `--edit-last --create-if-none` so a re-review replaces the previous
+            summary rather than stacking another one underneath it. Be specific and
+            cite `file:line`. If the diff is clean against all of the above, post
+            that in one line rather than manufacturing nits.
+
+          # `--allowedTools` adds to the base GitHub tools; Bash is not
+          # available unless a command is named here. The first version of this
+          # workflow allowed only the four gh calls, which is enough to read a
+          # diff and not enough to review one: every question above needs the
+          # file around the change, the history behind it, or the specification
+          # text.
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),WebFetch(domain:openid.net),WebFetch(domain:openid.github.io),WebFetch(domain:authzen-interop.net),WebFetch(domain:raw.githubusercontent.com)"
+
+      # The action exits 0 whether or not the review reached the pull request,
+      # so a run that was denied every tool it needed still shows a green check
+      # against a pull request nobody read. Both failure modes are caught here:
+      # tool calls the allowlist refused, and a review that posted nothing.
+      - name: Require the review to land
+        if: always() && steps.claude.conclusion != 'skipped'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+          BEFORE: ${{ steps.before.outputs.count }}
+        run: |
+          # No execution file means the action declined to run Claude at all,
+          # which is what happens on a pull request that edits this workflow.
+          # There is nothing to hold it to; say so and stop.
+          if [ -z "$EXECUTION_FILE" ] || [ ! -f "$EXECUTION_FILE" ]; then
+            echo "::notice::the reviewer did not run, so there is nothing to check; expected on a pull request that changes this workflow"
+            exit 0
+          fi
+
+          denied=$(jq -r '[.. | objects | select(has("permission_denials_count")) | .permission_denials_count] | first // 0' "$EXECUTION_FILE")
+
+          n=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --jq 'length')
+          m=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/comments" --jq 'length')
+          posted=$(( n + m - BEFORE ))
+
+          failed=0
+          if [ "$denied" -gt 0 ]; then
+            echo "::error::the reviewer was denied $denied tool call(s); widen --allowedTools above"
+            failed=1
+          fi
+          if [ "$posted" -le 0 ]; then
+            echo "::error::the reviewer posted nothing on #${PR}"
+            failed=1
+          fi
+          if [ "$failed" -eq 1 ]; then
+            exit 1
+          fi
+          echo "review landed: $posted comment(s), no denied tool calls"
