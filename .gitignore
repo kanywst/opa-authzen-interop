@@ -10,3 +10,8 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+_*
+
+# Upstream interop harness. The README tells you to clone openid/authzen here
+# to run the yarn test suite against a running PDP.
+/authzen/
