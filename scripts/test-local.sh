@@ -517,8 +517,8 @@ VALID_EVAL='{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_re
 
 # Well-known metadata document (Section 9): validate structure, not the host.
 # Search endpoints are advertised because all three rules are configured.
-# `capabilities` (Section 9.1.2) and `supported_obligations` come from
-# config.yaml.
+# `capabilities` (Section 9.1.2), `supported_obligations` and the Access
+# Request and Approval discovery members come from config.yaml.
 if wk_resp=$(curl -s "${PDP_URL}/.well-known/authzen-configuration"); then
   wk_check=$(WK="$wk_resp" python3 <<'EOF'
 import json, os
@@ -538,13 +538,17 @@ try:
     caps = m.get("capabilities")
     ok = ok and isinstance(caps, list) and caps == ["urn:kanywst:authzen:capability:todo-interop"]
     ok = ok and m.get("supported_obligations") == ["notification"]
+    # Access Request and Approval Profile discovery: advertised verbatim from
+    # config, not derived from the request host like the endpoints above.
+    ok = ok and m.get("access_request_endpoint") == "https://requests.example.com/access/v1/requests"
+    ok = ok and m.get("jwks_uri") == "https://requests.example.com/access/v1/jwks"
     print("ok" if ok else "bad")
 except Exception:
     print("bad")
 EOF
 )
   if [ "$wk_check" = "ok" ]; then
-    echo -e "${GREEN}PASS${NC} well-known advertises endpoints, capabilities, obligations (Section 9)"
+    echo -e "${GREEN}PASS${NC} well-known advertises endpoints, capabilities, obligations, access request (Section 9)"
     PASS=$((PASS+1))
   else
     echo -e "${RED}FAIL${NC} well-known metadata unexpected"

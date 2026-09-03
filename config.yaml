@@ -15,6 +15,12 @@ plugins:
     # core registers none of its own.
     capabilities:
       - "urn:kanywst:authzen:capability:todo-interop"
+    # Access Request and Approval Profile 1.0 discovery members. Nothing is
+    # actually served at these URIs: the profile lets a service other than the
+    # PDP host the Access Request Endpoint, and this harness only asserts that
+    # the PDP advertises what it was configured with.
+    access_request_endpoint: "https://requests.example.com/access/v1/requests"
+    jwks_uri: "https://requests.example.com/access/v1/jwks"
     # Obligations Profile 1.0. Also bounds the PEP's declared
     # `context.supported_obligations`, so list only what the policy issues.
     supported_obligations:
