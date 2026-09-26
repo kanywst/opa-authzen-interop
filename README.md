@@ -7,7 +7,7 @@ The AuthZEN API endpoints are provided by [opa-authzen-plugin](https://github.co
 - **Interop site:** [authzen-interop.net](https://authzen-interop.net)
 - **Test harness:** [openid/authzen/interop/authzen-todo-backend](https://github.com/openid/authzen/tree/main/interop/authzen-todo-backend)
 
-Requires opa-authzen-plugin **0.6 or newer**: the config here enables Search (0.3), capability URNs in the PDP metadata (0.4), decision context (0.5), and the Obligations Profile (0.6).
+Requires opa-authzen-plugin **0.7 or newer**: the config here enables Search (0.3), capability URNs in the PDP metadata (0.4), decision context (0.5), the Obligations Profile (0.6), and the Access Request and Approval discovery members (0.7).
 
 ## Usage
 
