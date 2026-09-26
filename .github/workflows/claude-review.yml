@@ -69,18 +69,12 @@ jobs:
             exit 1
           fi
 
-      # Snapshotted before the review so the check below can tell whether this
-      # run added anything, rather than seeing another bot's comment and
-      # concluding the review landed.
-      - name: Count comments before the review
+      # Stamped before the review so the check below can tell whether this run
+      # wrote anything. A count of comments is not enough: a re-review edits
+      # its summary in place (--edit-last), which leaves the count unchanged.
+      - name: Stamp the time before the review
         id: before
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          n=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --jq 'length')
-          m=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/comments" --jq 'length')
-          echo "count=$((n + m))" >> "$GITHUB_OUTPUT"
+        run: echo "since=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - uses: anthropics/claude-code-action@4036a180cf690f49529f5d8c79c998855287f590 # v1
         id: claude
@@ -156,7 +150,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-          BEFORE: ${{ steps.before.outputs.count }}
+          SINCE: ${{ steps.before.outputs.since }}
         run: |
           # No execution file means the action declined to run Claude at all,
           # which is what happens on a pull request that edits this workflow.
@@ -166,15 +160,25 @@ jobs:
             exit 0
           fi
 
-          denied=$(jq -r '[.. | objects | select(has("permission_denials_count")) | .permission_denials_count] | first // 0' "$EXECUTION_FILE")
+          # The file holds the raw SDK messages, whose result carries the
+          # denials as a `permission_denials` array. `permission_denials_count`
+          # exists only in the summary the action prints to the log, so reading
+          # that key here always saw zero.
+          denials='[.[] | select(.type == "result") | .permission_denials // [] | .[]]'
+          denied=$(jq "$denials | length" "$EXECUTION_FILE")
 
-          n=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --jq 'length')
-          m=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/comments" --jq 'length')
-          posted=$(( n + m - BEFORE ))
+          # Created or edited by the reviewer during this run. Filtered on the
+          # author so another bot editing its own comment does not count.
+          # shellcheck disable=SC2016 # $since is a jq variable, not a shell one
+          recent='[.[] | select(.user.login == "claude[bot]" and .updated_at >= $since)] | length'
+          n=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" | jq -s --arg since "$SINCE" "add | $recent")
+          m=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/comments" | jq -s --arg since "$SINCE" "add | $recent")
+          posted=$(( n + m ))
 
           failed=0
           if [ "$denied" -gt 0 ]; then
             echo "::error::the reviewer was denied $denied tool call(s); widen --allowedTools above"
+            jq -r "$denials | .[] | \"  denied: \\(.tool_name) \\(.tool_input | tostring | .[:200])\"" "$EXECUTION_FILE"
             failed=1
           fi
           if [ "$posted" -le 0 ]; then
@@ -184,4 +188,4 @@ jobs:
           if [ "$failed" -eq 1 ]; then
             exit 1
           fi
-          echo "review landed: $posted comment(s), no denied tool calls"
+          echo "review landed: $posted comment(s) written or edited, no denied tool calls"
