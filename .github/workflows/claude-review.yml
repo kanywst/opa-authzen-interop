@@ -76,7 +76,7 @@ jobs:
         id: before
         run: echo "since=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      - uses: anthropics/claude-code-action@4036a180cf690f49529f5d8c79c998855287f590 # v1
+      - uses: anthropics/claude-code-action@8cf3482550831fb35a4fc3fbf7ca139cf8028b4c # v1
         id: claude
         with:
           # A subscription token, not an API key: runs against the Claude plan
