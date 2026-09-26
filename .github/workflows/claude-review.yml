@@ -120,6 +120,13 @@ jobs:
                control, so an assertion that would pass against a PDP doing nothing is worse
                than no assertion: check each new test has a way to go red.
 
+            Read files in this checkout with Read, Grep and Glob, not Bash; Bash
+            runs only the gh and git commands allowed below, one command per
+            call. The plugin's source is not checked out here: fetch it from
+            https://raw.githubusercontent.com/kanywst/opa-authzen-plugin/main/
+            (CHANGELOG.md for what each release changed). Anything else is a
+            denied call, and a denied call fails this check.
+
             Nobody reads your reply. The only output that reaches a human is what
             you post to the pull request, so every run ends with a posted comment,
             including a run that finds nothing.
@@ -177,7 +184,7 @@ jobs:
 
           failed=0
           if [ "$denied" -gt 0 ]; then
-            echo "::error::the reviewer was denied $denied tool call(s); widen --allowedTools above"
+            echo "::error::the reviewer was denied $denied tool call(s); widen --allowedTools above if the call was needed, or route the prompt around it"
             jq -r "$denials | .[] | \"  denied: \\(.tool_name) \\(.tool_input | tostring | .[:200])\"" "$EXECUTION_FILE"
             failed=1
           fi
