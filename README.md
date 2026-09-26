@@ -7,7 +7,7 @@ The AuthZEN API endpoints are provided by [opa-authzen-plugin](https://github.co
 - **Interop site:** [authzen-interop.net](https://authzen-interop.net)
 - **Test harness:** [openid/authzen/interop/authzen-todo-backend](https://github.com/openid/authzen/tree/main/interop/authzen-todo-backend)
 
-Requires opa-authzen-plugin **0.7 or newer**: the config here enables Search (0.3), capability URNs in the PDP metadata (0.4), decision context (0.5), the Obligations Profile (0.6), and the Access Request and Approval discovery members (0.7).
+Requires opa-authzen-plugin **0.8 or newer**: the config here enables Search (0.3), capability URNs in the PDP metadata (0.4), decision context (0.5), the Obligations Profile (0.6), and the Access Request and Approval discovery members (0.7), and the e2e suite asserts the 0.8 response shape for a batch request without evaluations.
 
 ## Usage
 
@@ -112,18 +112,18 @@ The profile requires a PDP to ignore any Obligation Type in the PEP's `context.s
 
 ## Test coverage
 
-`./scripts/test-local.sh` replays the interop decision cases and additionally exercises the protocol surface those cases don't reach. Against opa-authzen-plugin 0.6:
+`./scripts/test-local.sh` replays the interop decision cases and additionally exercises the protocol surface those cases don't reach. Against opa-authzen-plugin 0.8:
 
 | Area                             | Spec reference          | Assertions |
 | -------------------------------- | ----------------------- | ---------: |
 | Per-user decision cases (5 users) | Section 5               |         40 |
-| Batch evaluations                | Section 7.1             |          3 |
+| Batch evaluations                | Section 7.1             |          5 |
 | Search APIs                      | Section 8               |         14 |
 | Search pagination                | Section 8.5             |          3 |
 | Evaluation semantics             | Section 7.1.2.1         |          3 |
 | Decision context and obligations | Section 5.5.1 + profile |          9 |
-| PDP metadata and transport       | Sections 9, 10, 11.7    |          7 |
-| **Total**                        |                         |     **79** |
+| PDP metadata and transport       | Sections 9, 10, 11.7    |          9 |
+| **Total**                        |                         |     **83** |
 
 Rego unit tests (`make rego-test`) cover the same policy rules without a running PDP: 40 tests.
 

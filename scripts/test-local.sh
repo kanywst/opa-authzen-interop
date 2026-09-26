@@ -171,6 +171,51 @@ test_evaluations '{"subject":{"type":"user","id":"'$MORTY'"},"action":{"name":"c
 
 test_evaluations '{"subject":{"type":"user","id":"'$JERRY'"},"action":{"name":"can_update_todo"},"evaluations":[{"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b92","properties":{"ownerID":"rick@the-citadel.com"}}},{"resource":{"type":"todo","id":"7240d0db-8ff0-41ec-98b2-34a096273b95","properties":{"ownerID":"jerry@the-smiths.com"}}}]}' '[{"decision": false}, {"decision": false}]'
 
+# A batch request with no evaluations, or an empty array, behaves as a single
+# Access Evaluation (Section 7.1), so the response is the singular shape:
+# a top-level decision and no evaluations array (certification c-3-4-2/3).
+test_evaluations_singular() {
+  local label="$1" request="$2" expected="$3"
+
+  response=$(curl -s -w "\n%{http_code}" \
+    -X POST "${PDP_URL}/access/v1/evaluations" \
+    -H "Content-Type: application/json" \
+    -d "$request" 2>/dev/null) || { echo -e "${YELLOW}ERROR${NC} Connection failed [${label}]"; ERROR=$((ERROR+1)); return; }
+
+  http_code=$(echo "$response" | tail -1)
+  body=$(echo "$response" | sed '$d')
+
+  if [ "$http_code" != "200" ]; then
+    echo -e "${YELLOW}ERROR${NC} HTTP $http_code [${label}]"
+    ERROR=$((ERROR+1))
+    return
+  fi
+
+  result=$(BODY="$body" EXPECTED="$expected" python3 <<'EOF'
+import json, os
+r = json.loads(os.environ["BODY"])
+want = os.environ["EXPECTED"] == "true"
+print("ok" if "evaluations" not in r and r.get("decision") is want else "bad")
+EOF
+)
+
+  if [ "$result" = "ok" ]; then
+    echo -e "${GREEN}PASS${NC} ${label}"
+    PASS=$((PASS+1))
+  else
+    echo -e "${RED}FAIL${NC} ${label}"
+    echo "  Request: $request"
+    echo "  Response: $body"
+    FAIL=$((FAIL+1))
+  fi
+}
+
+test_evaluations_singular "batch/no evaluations array answers singular (permit)" \
+  '{"subject":{"type":"user","id":"'$RICK'"},"action":{"name":"can_read_todos"},"resource":{"type":"todo","id":"todo-1"}}' true
+
+test_evaluations_singular "batch/empty evaluations array answers singular (deny)" \
+  '{"subject":{"type":"user","id":"'$BETH'"},"action":{"name":"can_create_todo"},"resource":{"type":"todo","id":"todo-1"},"evaluations":[]}' false
+
 # --- Search APIs (AuthZEN spec Section 8) ---
 echo ""
 echo "--- Search APIs ---"
@@ -581,6 +626,9 @@ fi
 # Transport-level error handling (Section 10.1 / 10.1.2).
 test_status "well-known GET returns 200"         GET  "/.well-known/authzen-configuration" ""                 ""            200
 test_status "wrong Content-Type rejected"        POST "/access/v1/evaluation"              "text/plain"       "$VALID_EVAL" 400
+# Media types are case-insensitive and tolerate whitespace (RFC 9110 8.3.1).
+test_status "mixed-case Content-Type accepted"   POST "/access/v1/evaluation"              "Application/JSON" "$VALID_EVAL" 200
+test_status "spaced Content-Type accepted"       POST "/access/v1/evaluation"              "application/json ; charset=utf-8" "$VALID_EVAL" 200
 test_status "malformed JSON body rejected"       POST "/access/v1/evaluation"              "application/json" '{"subject":' 400
 test_status "missing required resource rejected" POST "/access/v1/evaluation"              "application/json" '{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_read_todos"}}' 400
 
