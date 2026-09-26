@@ -63,6 +63,8 @@ The policy receives AuthZEN-shaped JSON input via the opa-authzen-plugin, which 
 - `capabilities` — operator-supplied PDP capability URNs in the metadata document (Section 9.1.2). Needs plugin 0.4+.
 - `supported_obligations` — opts into the Obligations Profile 1.0. Needs plugin 0.6+.
 
+The suite also asserts behavior with no config key behind it: since 0.8, a batch request without an `evaluations` array (or with an empty one) gets the singular `{"decision": ...}` response, and `Content-Type` matches case-insensitively.
+
 `PDP_VERSION` in the `Makefile` (and the default in `docker-compose.yaml`) must stay at or above the highest of those. When bumping the plugin, check its CHANGELOG for new config surface and extend `config.yaml`, `policy/authzen.rego`, and `scripts/test-local.sh` together — a feature the plugin ships but this repo never exercises is a feature nothing validates.
 
 ## Decision context and obligations
