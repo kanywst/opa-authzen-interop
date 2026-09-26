@@ -7,7 +7,7 @@ The AuthZEN API endpoints are provided by [opa-authzen-plugin](https://github.co
 - **Interop site:** [authzen-interop.net](https://authzen-interop.net)
 - **Test harness:** [openid/authzen/interop/authzen-todo-backend](https://github.com/openid/authzen/tree/main/interop/authzen-todo-backend)
 
-Requires opa-authzen-plugin **0.8 or newer**: the config here enables Search (0.3), capability URNs in the PDP metadata (0.4), decision context (0.5), the Obligations Profile (0.6), and the Access Request and Approval discovery members (0.7), and the e2e suite asserts the 0.8 response shape for a batch request without evaluations.
+Requires opa-authzen-plugin **0.8 or newer**: the config here enables Search (0.3), capability URNs in the PDP metadata (0.4), decision context (0.5), the Obligations Profile (0.6), and the Access Request and Approval discovery members (0.7). The e2e suite also asserts two 0.8 behaviors: the singular response to a batch request without evaluations, and case-insensitive `Content-Type` matching.
 
 ## Usage
 
