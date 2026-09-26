@@ -211,10 +211,10 @@ EOF
 }
 
 test_evaluations_singular "batch/no evaluations array answers singular (permit)" \
-  '{"subject":{"type":"user","id":"'$RICK'"},"action":{"name":"can_read_todos"},"resource":{"type":"todo","id":"todo-1"}}' true
+  '{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_read_todos"},"resource":{"type":"todo","id":"todo-1"}}' true
 
 test_evaluations_singular "batch/empty evaluations array answers singular (deny)" \
-  '{"subject":{"type":"user","id":"'$BETH'"},"action":{"name":"can_create_todo"},"resource":{"type":"todo","id":"todo-1"},"evaluations":[]}' false
+  '{"subject":{"type":"user","id":"'"$BETH"'"},"action":{"name":"can_create_todo"},"resource":{"type":"todo","id":"todo-1"},"evaluations":[]}' false
 
 # --- Search APIs (AuthZEN spec Section 8) ---
 echo ""
