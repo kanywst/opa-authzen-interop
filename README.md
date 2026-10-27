@@ -1,5 +1,7 @@
 # opa-authzen-interop
 
+> **Moved (2026-10-27).** This harness now lives in [opa-authzen-plugin/interop/todo](https://github.com/kanywst/opa-authzen-plugin/tree/main/interop/todo), and this repository is archived. Its only consumer was the plugin's CI, and keeping it in a separate repository let it fall two releases behind the plugin without any test going red.
+
 An OPA + Rego PDP implementation for the [OpenID AuthZEN interop](https://authzen-interop.net/) Todo scenario.
 The AuthZEN API endpoints are provided by [opa-authzen-plugin](https://github.com/kanywst/opa-authzen-plugin).
 
