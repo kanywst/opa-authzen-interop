@@ -18,7 +18,7 @@ concurrency:
 env:
   # Pinned so an OPA release that breaks the policy fails in a commit that
   # names the version.
-  OPA_VERSION: v1.19.1
+  OPA_VERSION: v1.21.3
 
 jobs:
   rego:

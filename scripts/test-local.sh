@@ -566,7 +566,7 @@ VALID_EVAL='{"subject":{"type":"user","id":"'"$RICK"'"},"action":{"name":"can_re
 # Request and Approval discovery members come from config.yaml.
 if wk_resp=$(curl -s "${PDP_URL}/.well-known/authzen-configuration"); then
   wk_check=$(WK="$wk_resp" python3 <<'EOF'
-import json, os
+import base64, json, os
 try:
     m = json.loads(os.environ.get("WK", ""))
     if not isinstance(m, dict):
@@ -587,13 +587,21 @@ try:
     # config, not derived from the request host like the endpoints above.
     ok = ok and m.get("access_request_endpoint") == "https://requests.example.com/access/v1/requests"
     ok = ok and m.get("jwks_uri") == "https://requests.example.com/access/v1/jwks"
+    # Signed metadata (Section 9.1.3): published verbatim, with the REQUIRED
+    # iss claim.
+    sm = m.get("signed_metadata")
+    ok = ok and isinstance(sm, str) and sm.count(".") == 2
+    if ok:
+        seg = sm.split(".")[1]
+        claims = json.loads(base64.urlsafe_b64decode(seg + "=" * (-len(seg) % 4)))
+        ok = claims.get("iss") == "https://pdp.example.com"
     print("ok" if ok else "bad")
 except Exception:
     print("bad")
 EOF
 )
   if [ "$wk_check" = "ok" ]; then
-    echo -e "${GREEN}PASS${NC} well-known advertises endpoints, capabilities, obligations, access request (Section 9)"
+    echo -e "${GREEN}PASS${NC} well-known advertises endpoints, capabilities, obligations, access request, signed metadata (Section 9)"
     PASS=$((PASS+1))
   else
     echo -e "${RED}FAIL${NC} well-known metadata unexpected"

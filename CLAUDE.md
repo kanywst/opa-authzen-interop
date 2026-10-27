@@ -56,12 +56,14 @@ The policy receives AuthZEN-shaped JSON input via the opa-authzen-plugin, which 
 
 ## Config
 
-`config.yaml` configures the opa-authzen-plugin: routes to the `authzen` package and reads the `allow` decision. All endpoints are served on OPA's default port (8181). Beyond `path`/`decision` it sets four things, each of which the e2e suite asserts:
+`config.yaml` configures the opa-authzen-plugin: routes to the `authzen` package and reads the `allow` decision. All endpoints are served on OPA's default port (8181). Beyond `path`/`decision` it sets the following, each of which the e2e suite asserts:
 
 - `search` — names the Rego rules backing the Subject/Resource/Action Search APIs (`subject_search`, `resource_search`, `action_search`). Needs plugin 0.3+.
 - `decision_context` — names the `decision_context` rule, returned as the Decision's optional `context` member (spec Section 5.5.1). Needs plugin 0.5+.
 - `capabilities` — operator-supplied PDP capability URNs in the metadata document (Section 9.1.2). Needs plugin 0.4+.
 - `supported_obligations` — opts into the Obligations Profile 1.0. Needs plugin 0.6+.
+- `access_request_endpoint` / `jwks_uri` — Access Request and Approval discovery members. Needs plugin 0.7+.
+- `signed_metadata` — a fixture JWT published in the metadata document (Section 9.1.3). Its claims must agree with the keys above or the plugin refuses to start, so change them together. Needs plugin 0.10+.
 
 The suite also asserts behavior with no config key behind it: since 0.8, a batch request without an `evaluations` array (or with an empty one) gets the singular `{"decision": ...}` response, and `Content-Type` matches case-insensitively.
 

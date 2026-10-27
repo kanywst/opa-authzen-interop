@@ -1,11 +1,12 @@
 PDP_IMAGE := ghcr.io/kanywst/opa-authzen-plugin
 # Pin to a concrete release rather than `latest`, which lags. The suite needs
-# 0.8 or newer: batch evaluations and Search arrived in 0.3, capability URNs in
-# the metadata document in 0.4, decision context in 0.5, the Obligations
-# Profile in 0.6, the Access Request and Approval discovery members in 0.7, and
-# the singular response to a batch without evaluations and case-insensitive
-# Content-Type matching in 0.8 — all of which the tests assert.
-PDP_VERSION := 0.8
+# 0.10 or newer: batch evaluations and Search arrived in 0.3, capability URNs
+# in the metadata document in 0.4, decision context in 0.5, the Obligations
+# Profile in 0.6, the Access Request and Approval discovery members in 0.7, the
+# singular response to a batch without evaluations and case-insensitive
+# Content-Type matching in 0.8, and signed metadata in 0.10 — all of which the
+# tests assert.
+PDP_VERSION := 0.10
 
 .PHONY: test rego-test integration-test up down clean
 
